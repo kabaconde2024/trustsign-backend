@@ -1,0 +1,84 @@
+services:
+  # 1. SERVICE BACKEND (Spring Boot)
+  - type: web
+    name: trustsign-backend
+    runtime: image
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: starter
+    dockerfilePath: Back_end/Dockerfile
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: DB_URL
+        fromDatabase:
+          name: trustsign-db
+          property: connectionString
+      - key: DB_USERNAME
+        fromDatabase:
+          name: trustsign-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: trustsign-db
+          property: password
+      - key: SPRING_DATA_MONGODB_URI
+        value: mongodb+srv://kabaconde:Kabaconde2026@cluster0.k19f9bf.mongodb.net/signature_audit_db?retryWrites=true&w=majority
+      - key: SPRING_MAIL_PASSWORD
+        value: xsmtspi8-98a8ed9277802bab2503d69ed4730bc2afe80733dbb5be884c06c00a87e99d75-c91EECMZB9L58UMp
+      - key: GOOGLE_CLIENT_ID
+        value: 320659477478-00hgn1iql2f9331r33go2tie7b5em2u.apps.googleusercontent.com
+      - key: GOOGLE_CLIENT_SECRET
+        value: GO0CSPX-uwMG8I6YJ1PnSsuIeY9AabS6Du_
+      - key: SUPERADMIN_EMAIL
+        value: kaba.conde@ismg.tn
+      - key: SUPERADMIN_PASSWORD
+        value: Kabaconde2026a
+      - key: SUPERADMIN_NOM
+        value: Conde
+      - key: SUPERADMIN_PREINM
+        value: Kaba
+      - key: HSM_PIN
+        value: 1234
+      - key: JAVA_OPTS
+        value: -Xmx512m -Djava.net.preferIPv4Stack=true
+    disks:
+      - name: pki-storage
+        mountPath: /data
+        sizeGB: 10
+
+  # 2. SERVICE FRONTEND (React)
+  - type: web
+    name: trustsign-frontend
+    runtime: node
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: free
+    buildCommand: cd pfe-frontend && npm install && npm run build
+    publishDirectory: pfe-frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://trustsign-backend.onrender.com
+      - key: REACT_APP_IA_URL
+        value: https://trustsign-ia.onrender.com
+
+  # 3. SERVICE IA (Python FastAPI)
+  - type: web
+    name: trustsign-ia
+    runtime: python
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: free
+    buildCommand: cd Service_IA && pip install -r requirements.txt
+    startCommand: cd Service_IA && uvicorn main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: BACKEND_URL
+        value: https://trustsign-backend.onrender.com
+      - key: MONGODB_URI
+        value: mongodb+srv://kabaconde:Kabaconde2026@cluster0.k19f9bf.mongodb.net/signature_audit_db?retryWrites=true&w=majority
+
+databases:
+  - name: trustsign-db
+    databaseName: trustsign_db
+    user: trustsign_user
+    plan: starter
