@@ -1,0 +1,104 @@
+services:
+  # ============================================
+  # 1. SERVICE BACKEND (Spring Boot)
+  # ============================================
+  - type: web
+    name: trustsign-backend
+    runtime: image
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: starter
+    dockerfilePath: Back_end/Dockerfile
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_URL
+        sync: false
+      - key: SPRING_DATA_MONGODB_URI
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://trustsign-backend.onrender.com/login/oauth2/code/google
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: SUPERADMIN_NOM
+        sync: false
+      - key: SUPERADMIN_PRENOM
+        sync: false
+      - key: SUPERADMIN_PHONE
+        sync: false
+      - key: HSM_PIN
+        value: 1234
+      - key: HSM_USER_PIN
+        value: 1234
+      - key: SOFTHSM2_CONF
+        value: /app/softhsm2.conf
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: SPRING_BOOT_API_KEY
+        sync: false
+      - key: SPRING_BOOT_URL
+        value: https://trustsign-backend.onrender.com
+      - key: SPRING_BOOT_VERIFY_SSL
+        value: false
+      - key: JAVA_OPTS
+        value: -Xmx512m -Djava.net.preferIPv4Stack=true
+      - key: DDL_AUTO
+        value: update
+      - key: PORT
+        value: 8080
+      - key: PKI_STOCKAGE
+        value: /data/pki
+      - key: ARCHIVAGE_DOSSIER_BASE
+        value: /data/archives
+    disks:
+      - name: pki-storage
+        mountPath: /data
+        sizeGB: 10
+
+  # ============================================
+  # 2. SERVICE FRONTEND (React)
+  # ============================================
+  - type: web
+    name: trustsign-frontend
+    runtime: image
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: free
+    dockerfilePath: pfe-frontend/Dockerfile
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://trustsign-backend.onrender.com
+      - key: REACT_APP_IA_URL
+        value: https://trustsign-ia.onrender.com
+
+  # ============================================
+  # 3. SERVICE IA (Python FastAPI)
+  # ============================================
+  - type: web
+    name: trustsign-ia
+    runtime: image
+    repo: https://github.com/kabaconde2024/trustsign-backend
+    branch: main
+    plan: free
+    dockerfilePath: Service_IA/Dockerfile
+    envVars:
+      - key: BACKEND_URL
+        value: https://trustsign-backend.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: PORT
+        value: 8000

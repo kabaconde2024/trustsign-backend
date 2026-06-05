@@ -1,0 +1,72 @@
+cd C:\Users\MSI\Documents\Projet_Mastere
+
+# Ajouter les configurations sensibles au .gitignore
+@"
+
+# ===== FICHIERS DE CONFIGURATION AVEC SECRETS =====
+**/application.properties
+**/application-dev.properties
+**/application-prod.properties
+**/application-render.properties
+.env
+.env.render
+.env.local
+
+# ===== CERTIFICATS ET CLES =====
+*.p12
+*.jks
+*.pfx
+*.crt
+*.key
+keystore.p12
+truststore.p12
+
+# ===== DONNEES SENSIBLES =====
+coffre-pki/
+storage/
+uploads/
+data/
+pki-storage/
+*.db
+
+# ===== LOGS =====
+*.log
+derby.log
+logs/
+
+# ===== RENDER CONFIG (avec secrets) =====
+render.yaml
+render.yaml.backup
+
+# ===== BACKEND =====
+Back_end/target/
+Back_end/.mvn/
+Back_end/mvnw
+Back_end/mvnw.cmd
+Back_end/coffre-pki/
+Back_end/storage/
+Back_end/uploads/
+
+# ===== FRONTEND =====
+pfe-frontend/node_modules/
+pfe-frontend/build/
+pfe-frontend/.env
+pfe-frontend/.env.local
+pfe-frontend/coverage/
+
+# ===== SERVICE IA =====
+Service_IA/venv/
+Service_IA/__pycache__/
+Service_IA/.pytest_cache/
+Service_IA/.env
+Service_IA/*.pyc
+Service_IA/modeles/__pycache__/
+Service_IA/routeurs/__pycache__/
+Service_IA/services/__pycache__/
+
+# ===== OS FILES =====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.code-workspace
+"@ | Out-File -FilePath ".gitignore" -Encoding UTF8 -Append
