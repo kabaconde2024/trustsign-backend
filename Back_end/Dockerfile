@@ -40,16 +40,12 @@ RUN chmod -R 777 /app/softhsm_tokens /app/softhsm2.conf /data
 # Copie du JAR produit à l'étape 1
 COPY --from=build /app/target/*.jar app.jar
 
-# Variables d'environnement
+# Variables d'environnement par défaut (surchargeables par Render)
 ENV SOFTHSM2_CONF=/app/softhsm2.conf
-ENV SPRING_PROFILES_ACTIVE=render
 ENV JAVA_OPTS="-Xmx512m -Djava.net.preferIPv4Stack=true"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD curl -f http://localhost:8080/actuator/health || exit 1
-
+# Exposer le port
 EXPOSE 8080
 
-# Exécution
+# Exécution - NE PAS mettre SPRING_PROFILES_ACTIVE ici, laisser Render le définir
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
