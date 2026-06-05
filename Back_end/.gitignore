@@ -4,7 +4,6 @@ cd C:\Users\MSI\Documents\Projet_Mastere
 @"
 
 # ===== FICHIERS DE CONFIGURATION AVEC SECRETS =====
-**/application.properties
 **/application-dev.properties
 **/application-prod.properties
 **/application-render.properties
