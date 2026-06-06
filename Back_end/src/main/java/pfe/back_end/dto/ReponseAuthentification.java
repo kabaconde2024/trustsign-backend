@@ -8,9 +8,10 @@ public class ReponseAuthentification {
     private boolean succes;
     private String message;
     private boolean necessiteMfa;
-    private String prenom;  // ← AJOUTER
-    private String nom;      // ← AJOUTER
+    private String prenom;
+    private String nom;
 
+    // Constructeurs
     public ReponseAuthentification() {}
 
     public ReponseAuthentification(String accessToken, String type, String email, String role,
@@ -27,14 +28,29 @@ public class ReponseAuthentification {
         this.nom = nom;
     }
 
-    // Getters et Setters existants...
-
+    // GETTERS (OBLIGATOIRES)
+    public String getAccessToken() { return accessToken; }
+    public String getType() { return type; }
+    public String getEmail() { return email; }
+    public String getRole() { return role; }
+    public boolean isSucces() { return succes; }
+    public String getMessage() { return message; }
+    public boolean isNecessiteMfa() { return necessiteMfa; }
     public String getPrenom() { return prenom; }
-    public void setPrenom(String prenom) { this.prenom = prenom; }
-
     public String getNom() { return nom; }
+
+    // SETTERS
+    public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
+    public void setType(String type) { this.type = type; }
+    public void setEmail(String email) { this.email = email; }
+    public void setRole(String role) { this.role = role; }
+    public void setSucces(boolean succes) { this.succes = succes; }
+    public void setMessage(String message) { this.message = message; }
+    public void setNecessiteMfa(boolean necessiteMfa) { this.necessiteMfa = necessiteMfa; }
+    public void setPrenom(String prenom) { this.prenom = prenom; }
     public void setNom(String nom) { this.nom = nom; }
 
+    // BUILDER
     public static ReponseAuthentificationBuilder builder() {
         return new ReponseAuthentificationBuilder();
     }
