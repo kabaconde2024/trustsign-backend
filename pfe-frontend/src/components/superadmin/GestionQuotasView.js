@@ -38,26 +38,7 @@ import {
     DateRange as DateRangeIcon,
     EventNote as EventNoteIcon
 } from '@mui/icons-material';
-
-const API_BASE_URL = 'https://backendmemoire.onrender.com';
-
-// 🔧 FONCTION POUR LES REQUÊTES AVEC COOKIES (comme dans ConfigurationView)
-const fetchAPI = async (endpoint, options = {}) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        credentials: 'include',  // ⚠️ CRUCIAL : Envoie les cookies HttpOnly
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            ...options.headers
-        }
-    });
-    
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-};
+import API from '../../services/api';  // ← IMPORTANT
 
 const GestionQuotasView = ({ setSnackbar, isMobile }) => {
     const [loading, setLoading] = useState(false);
@@ -69,11 +50,29 @@ const GestionQuotasView = ({ setSnackbar, isMobile }) => {
     const [openResetDialog, setOpenResetDialog] = useState(false);
     const [userToReset, setUserToReset] = useState(null);
 
+    // Fonction pour les requêtes API avec token
+    const fetchAPI = async (endpoint, options = {}) => {
+        try {
+            let response;
+            if (options.method === 'DELETE') {
+                response = await API.delete(endpoint);
+            } else if (options.method === 'PUT') {
+                response = await API.put(endpoint);
+            } else {
+                response = await API.get(endpoint);
+            }
+            return response.data;
+        } catch (error) {
+            console.error(`Erreur fetch ${endpoint}:`, error);
+            throw error;
+        }
+    };
+
     // Récupérer tous les utilisateurs avec leurs quotas
     const fetchAllQuotas = async () => {
         setLoading(true);
         try {
-            // 🔧 Récupérer la liste des utilisateurs AVEC COOKIES
+            // Récupérer la liste des utilisateurs
             const users = await fetchAPI('/admin/utilisateurs');
             
             // Récupérer le quota pour chaque utilisateur
@@ -98,9 +97,9 @@ const GestionQuotasView = ({ setSnackbar, isMobile }) => {
         } catch (error) {
             console.error("Erreur chargement quotas:", error);
             if (error.message === 'HTTP 403') {
-                setSnackbar({ open: true, message: "Accès non autorisé. Droits Super Admin requis.", severity: 'error' });
+                if (setSnackbar) setSnackbar({ open: true, message: "Accès non autorisé. Droits Super Admin requis.", severity: 'error' });
             } else {
-                setSnackbar({ open: true, message: "Erreur chargement des quotas", severity: 'error' });
+                if (setSnackbar) setSnackbar({ open: true, message: "Erreur chargement des quotas", severity: 'error' });
             }
         } finally {
             setLoading(false);
@@ -116,15 +115,13 @@ const GestionQuotasView = ({ setSnackbar, isMobile }) => {
         if (!userToReset) return;
         
         try {
-            await fetchAPI(`/signature/quota/reinitialiser/${userToReset.id}`, {
-                method: 'DELETE'
-            });
+            await API.delete(`/signature/quota/reinitialiser/${userToReset.id}`);
             
-            setSnackbar({ open: true, message: `Quota réinitialisé pour ${userToReset.prenom} ${userToReset.nom}`, severity: 'success' });
+            if (setSnackbar) setSnackbar({ open: true, message: `Quota réinitialisé pour ${userToReset.prenom} ${userToReset.nom}`, severity: 'success' });
             fetchAllQuotas();
             
         } catch (error) {
-            setSnackbar({ open: true, message: error.message || 'Erreur lors de la réinitialisation', severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: error.message || 'Erreur lors de la réinitialisation', severity: 'error' });
         } finally {
             setOpenResetDialog(false);
             setUserToReset(null);
@@ -136,17 +133,15 @@ const GestionQuotasView = ({ setSnackbar, isMobile }) => {
         if (!selectedUser || newLimite < 1 || newLimite > 500) return;
         
         try {
-            await fetchAPI(`/signature/quota/modifier-limite/${selectedUser.id}?limite=${newLimite}`, {
-                method: 'PUT'
-            });
+            await API.put(`/signature/quota/modifier-limite/${selectedUser.id}?limite=${newLimite}`);
             
-            setSnackbar({ open: true, message: `Limite modifiée à ${newLimite} pour ${selectedUser.prenom} ${selectedUser.nom}`, severity: 'success' });
+            if (setSnackbar) setSnackbar({ open: true, message: `Limite modifiée à ${newLimite} pour ${selectedUser.prenom} ${selectedUser.nom}`, severity: 'success' });
             fetchAllQuotas();
             setOpenEditDialog(false);
             setSelectedUser(null);
             
         } catch (error) {
-            setSnackbar({ open: true, message: error.message || 'Erreur lors de la modification', severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: error.message || 'Erreur lors de la modification', severity: 'error' });
         }
     };
 

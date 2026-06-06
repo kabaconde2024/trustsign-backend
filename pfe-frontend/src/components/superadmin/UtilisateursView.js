@@ -6,7 +6,7 @@ import {
     DialogContent, DialogActions, Stack, Avatar, MenuItem, Tooltip, useMediaQuery, Card, CardContent
 } from '@mui/material';
 import { Search, Edit, Block, CheckCircle, Refresh, Add, Security } from '@mui/icons-material';
-import axios from 'axios';
+import API from '../../services/api';  // ← IMPORTANT : Utiliser l'instance API
 
 const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [users, setUsers] = useState([]);
@@ -24,12 +24,12 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('https://backendmemoire.onrender.com/api/admin/utilisateurs', { withCredentials: true });
+            const response = await API.get('/admin/utilisateurs');  // ← API.get au lieu d'axios
             setUsers(response.data);
             setFilteredUsers(response.data);
         } catch (error) {
             console.error("Erreur:", error);
-            setSnackbar({ open: true, message: "Erreur chargement utilisateurs", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "Erreur chargement utilisateurs", severity: 'error' });
         } finally { setLoading(false); }
     };
 
@@ -47,28 +47,33 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const handleRoleChange = async () => {
         if (!selectedUser || !newRole) return;
         try {
-            await axios.put(`https://backendmemoire.onrender.com/api/admin/utilisateurs/${selectedUser.id}/role`, { role: newRole }, { withCredentials: true });
-            setSnackbar({ open: true, message: `Rôle de ${selectedUser.prenom} ${selectedUser.nom} mis à jour`, severity: 'success' });
+            await API.put(`/admin/utilisateurs/${selectedUser.id}/role`, { role: newRole });
+            if (setSnackbar) setSnackbar({ open: true, message: `Rôle de ${selectedUser.prenom} ${selectedUser.nom} mis à jour`, severity: 'success' });
             setOpenDialog(false);
             fetchUsers();
         } catch (error) {
-            setSnackbar({ open: true, message: "Erreur mise à jour rôle", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "Erreur mise à jour rôle", severity: 'error' });
         }
     };
 
     const handleToggleStatus = async (userId, currentStatus) => {
         const newStatus = currentStatus === 'ACTIF' ? 'INACTIF' : 'ACTIF';
         try {
-            await axios.put(`https://backendmemoire.onrender.com/api/admin/utilisateurs/${userId}/status`, { statut: newStatus }, { withCredentials: true });
-            setSnackbar({ open: true, message: `Compte ${newStatus === 'ACTIF' ? 'activé' : 'désactivé'}`, severity: 'success' });
+            await API.put(`/admin/utilisateurs/${userId}/status`, { statut: newStatus });
+            if (setSnackbar) setSnackbar({ open: true, message: `Compte ${newStatus === 'ACTIF' ? 'activé' : 'désactivé'}`, severity: 'success' });
             fetchUsers();
         } catch (error) {
-            setSnackbar({ open: true, message: "Erreur modification statut", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "Erreur modification statut", severity: 'error' });
         }
     };
 
     const getRoleColor = (role) => {
-        switch(role) { case 'SUPER_ADMIN': return 'error'; case 'ADMIN_ENTREPRISE': return 'warning'; case 'EMPLOYE': return 'info'; default: return 'default'; }
+        switch(role) { 
+            case 'SUPER_ADMIN': return 'error'; 
+            case 'ADMIN_ENTREPRISE': return 'warning'; 
+            case 'EMPLOYE': return 'info'; 
+            default: return 'default'; 
+        }
     };
 
     const getCertificatStatus = (user) => {
@@ -86,7 +91,14 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
             </Stack>
 
             <Paper sx={{ p: mobile ? 1.5 : 2, mb: 3, borderRadius: '12px' }}>
-                <TextField fullWidth placeholder="Rechercher un utilisateur..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} size={mobile ? "small" : "medium"} InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} />
+                <TextField 
+                    fullWidth 
+                    placeholder="Rechercher un utilisateur..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    size={mobile ? "small" : "medium"} 
+                    InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} 
+                />
             </Paper>
 
             {mobile ? (
@@ -99,16 +111,29 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
                                     <Stack spacing={1.5}>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Avatar sx={{ bgcolor: '#ffc107', width: 40, height: 40 }}>{user.prenom?.[0]}{user.nom?.[0]}</Avatar>
-                                            <Box><Typography variant="body2" fontWeight="bold">{user.prenom} {user.nom}</Typography><Typography variant="caption" color="textSecondary">{user.email}</Typography></Box>
+                                            <Box>
+                                                <Typography variant="body2" fontWeight="bold">{user.prenom} {user.nom}</Typography>
+                                                <Typography variant="caption" color="textSecondary">{user.email}</Typography>
+                                            </Box>
                                         </Stack>
                                         <Stack direction="row" spacing={1} flexWrap="wrap">
                                             <Chip label={user.role} size="small" color={getRoleColor(user.role)} />
                                             <Chip label={user.statut || 'ACTIF'} size="small" color={user.statut === 'ACTIF' ? 'success' : 'error'} />
-                                            <Tooltip title={certStatus.tooltip}><Chip icon={<Security />} label={certStatus.label} size="small" color={certStatus.color} variant={certStatus.color === 'default' ? 'outlined' : 'filled'} /></Tooltip>
+                                            <Tooltip title={certStatus.tooltip}>
+                                                <Chip icon={<Security />} label={certStatus.label} size="small" color={certStatus.color} variant={certStatus.color === 'default' ? 'outlined' : 'filled'} />
+                                            </Tooltip>
                                         </Stack>
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                            <Tooltip title={user.statut === 'ACTIF' ? 'Désactiver' : 'Activer'}><IconButton size="small" color="primary" onClick={() => handleToggleStatus(user.id, user.statut)}>{user.statut === 'ACTIF' ? <Block /> : <CheckCircle />}</IconButton></Tooltip>
-                                            <Tooltip title="Modifier le rôle"><IconButton size="small" color="secondary" onClick={() => { setSelectedUser(user); setNewRole(user.role); setOpenDialog(true); }}><Edit /></IconButton></Tooltip>
+                                            <Tooltip title={user.statut === 'ACTIF' ? 'Désactiver' : 'Activer'}>
+                                                <IconButton size="small" color="primary" onClick={() => handleToggleStatus(user.id, user.statut)}>
+                                                    {user.statut === 'ACTIF' ? <Block /> : <CheckCircle />}
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Modifier le rôle">
+                                                <IconButton size="small" color="secondary" onClick={() => { setSelectedUser(user); setNewRole(user.role); setOpenDialog(true); }}>
+                                                    <Edit />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Stack>
                                     </Stack>
                                 </CardContent>
@@ -119,16 +144,93 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
             ) : (
                 <TableContainer component={Paper} sx={{ borderRadius: '12px', overflowX: 'auto' }}>
                     <Table sx={{ minWidth: 800 }}>
-                        <TableHead sx={{ bgcolor: '#f5f5f5' }}><TableRow><TableCell><b>Utilisateur</b></TableCell><TableCell><b>Email</b></TableCell><TableCell><b>Rôle</b></TableCell><TableCell><b>Statut</b></TableCell><TableCell><b>Certificat PKI</b></TableCell><TableCell align="center"><b>Actions</b></TableCell></TableRow></TableHead>
-                        <TableBody>{loading ? <TableRow><TableCell colSpan={6} align="center">Chargement...</TableCell></TableRow> : filteredUsers.length === 0 ? <TableRow><TableCell colSpan={6} align="center">Aucun utilisateur trouvé</TableCell></TableRow> : filteredUsers.map((user) => { const certStatus = getCertificatStatus(user); return (<TableRow key={user.id} hover><TableCell><Stack direction="row" spacing={1} alignItems="center"><Avatar sx={{ bgcolor: '#ffc107', width: 32, height: 32 }}>{user.prenom?.[0]}{user.nom?.[0]}</Avatar><Box><Typography variant="body2" fontWeight="bold">{user.prenom} {user.nom}</Typography><Typography variant="caption" color="textSecondary">ID: {user.id}</Typography></Box></Stack></TableCell><TableCell>{user.email}</TableCell><TableCell><Chip label={user.role} size="small" color={getRoleColor(user.role)} /></TableCell><TableCell><Chip label={user.statut || 'ACTIF'} size="small" color={user.statut === 'ACTIF' ? 'success' : 'error'} /></TableCell><TableCell><Tooltip title={certStatus.tooltip}><Chip icon={<Security />} label={certStatus.label} size="small" color={certStatus.color} variant={certStatus.color === 'default' ? 'outlined' : 'filled'} /></Tooltip></TableCell><TableCell align="center"><Stack direction="row" spacing={1} justifyContent="center"><Tooltip title={user.statut === 'ACTIF' ? 'Désactiver' : 'Activer'}><IconButton size="small" color="primary" onClick={() => handleToggleStatus(user.id, user.statut)}>{user.statut === 'ACTIF' ? <Block /> : <CheckCircle />}</IconButton></Tooltip><Tooltip title="Modifier le rôle"><IconButton size="small" color="secondary" onClick={() => { setSelectedUser(user); setNewRole(user.role); setOpenDialog(true); }}><Edit /></IconButton></Tooltip><Tooltip title="Rafraîchir"><IconButton size="small" color="info" onClick={fetchUsers}><Refresh /></IconButton></Tooltip></Stack></TableCell></TableRow>); })}</TableBody>
+                        <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+                            <TableRow>
+                                <TableCell><b>Utilisateur</b></TableCell>
+                                <TableCell><b>Email</b></TableCell>
+                                <TableCell><b>Rôle</b></TableCell>
+                                <TableCell><b>Statut</b></TableCell>
+                                <TableCell><b>Certificat PKI</b></TableCell>
+                                <TableCell align="center"><b>Actions</b></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {loading ? 
+                                <TableRow><TableCell colSpan={6} align="center">Chargement...</TableCell></TableRow> : 
+                                filteredUsers.length === 0 ? 
+                                <TableRow><TableCell colSpan={6} align="center">Aucun utilisateur trouvé</TableCell></TableRow> : 
+                                filteredUsers.map((user) => {
+                                    const certStatus = getCertificatStatus(user);
+                                    return (
+                                        <TableRow key={user.id} hover>
+                                            <TableCell>
+                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                    <Avatar sx={{ bgcolor: '#ffc107', width: 32, height: 32 }}>{user.prenom?.[0]}{user.nom?.[0]}</Avatar>
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight="bold">{user.prenom} {user.nom}</Typography>
+                                                        <Typography variant="caption" color="textSecondary">ID: {user.id}</Typography>
+                                                    </Box>
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell>{user.email}</TableCell>
+                                            <TableCell><Chip label={user.role} size="small" color={getRoleColor(user.role)} /></TableCell>
+                                            <TableCell><Chip label={user.statut || 'ACTIF'} size="small" color={user.statut === 'ACTIF' ? 'success' : 'error'} /></TableCell>
+                                            <TableCell>
+                                                <Tooltip title={certStatus.tooltip}>
+                                                    <Chip icon={<Security />} label={certStatus.label} size="small" color={certStatus.color} variant={certStatus.color === 'default' ? 'outlined' : 'filled'} />
+                                                </Tooltip>
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Stack direction="row" spacing={1} justifyContent="center">
+                                                    <Tooltip title={user.statut === 'ACTIF' ? 'Désactiver' : 'Activer'}>
+                                                        <IconButton size="small" color="primary" onClick={() => handleToggleStatus(user.id, user.statut)}>
+                                                            {user.statut === 'ACTIF' ? <Block /> : <CheckCircle />}
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Modifier le rôle">
+                                                        <IconButton size="small" color="secondary" onClick={() => { setSelectedUser(user); setNewRole(user.role); setOpenDialog(true); }}>
+                                                            <Edit />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Rafraîchir">
+                                                        <IconButton size="small" color="info" onClick={fetchUsers}>
+                                                            <Refresh />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
+                            }
+                        </TableBody>
                     </Table>
                 </TableContainer>
             )}
 
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ bgcolor: '#1a237e', color: 'white' }}>Modifier le rôle</DialogTitle>
-                <DialogContent sx={{ mt: 2 }}><Typography variant="body2" gutterBottom>Utilisateur: <strong>{selectedUser?.prenom} {selectedUser?.nom}</strong></Typography><TextField select fullWidth label="Nouveau rôle" value={newRole} onChange={(e) => setNewRole(e.target.value)} sx={{ mt: 2 }}>{roles.map((role) => (<MenuItem key={role} value={role}>{role}</MenuItem>))}</TextField></DialogContent>
-                <DialogActions><Button onClick={() => setOpenDialog(false)}>Annuler</Button><Button onClick={handleRoleChange} variant="contained" color="primary">Enregistrer</Button></DialogActions>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Typography variant="body2" gutterBottom>
+                        Utilisateur: <strong>{selectedUser?.prenom} {selectedUser?.nom}</strong>
+                    </Typography>
+                    <TextField 
+                        select 
+                        fullWidth 
+                        label="Nouveau rôle" 
+                        value={newRole} 
+                        onChange={(e) => setNewRole(e.target.value)} 
+                        sx={{ mt: 2 }}
+                    >
+                        {roles.map((role) => (
+                            <MenuItem key={role} value={role}>{role}</MenuItem>
+                        ))}
+                    </TextField>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDialog(false)}>Annuler</Button>
+                    <Button onClick={handleRoleChange} variant="contained" color="primary">Enregistrer</Button>
+                </DialogActions>
             </Dialog>
         </Box>
     );

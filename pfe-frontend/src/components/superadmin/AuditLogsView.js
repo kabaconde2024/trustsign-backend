@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import {
     Box, Paper, Typography, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Chip, IconButton, TextField, MenuItem,
@@ -13,9 +12,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import PendingIcon from '@mui/icons-material/Pending';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import CloseIcon from '@mui/icons-material/Close';
-
-// URL du backend Render
-const API_BASE_URL = 'https://backendmemoire.onrender.com';
+import API from '../../services/api';  // ← IMPORTANT
 
 const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [logs, setLogs] = useState([]);
@@ -61,12 +58,13 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            let url = `${API_BASE_URL}/api/admin/audit/logs`;
+            let url = '/admin/audit/logs';  // ← Supprimé API_BASE_URL et /api
             const params = [];
             if (filterUserEmail) params.push(`userEmail=${encodeURIComponent(filterUserEmail)}`);
             if (filterEventType) params.push(`eventType=${filterEventType}`);
             if (params.length > 0) url += '?' + params.join('&');
-            const response = await axios.get(url, { withCredentials: true });
+            
+            const response = await API.get(url);  // ← API.get au lieu d'axios
             setLogs(response.data);
         } catch (error) {
             console.error('Erreur chargement logs:', error);

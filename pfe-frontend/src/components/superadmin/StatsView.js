@@ -5,18 +5,15 @@ import {
     Avatar, LinearProgress, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Chip,
     Tooltip, useMediaQuery, Button, Dialog, DialogTitle, 
-    DialogContent, IconButton as MuiIconButton,IconButton
+    DialogContent, IconButton as MuiIconButton
 } from '@mui/material';
 import { 
-    People, Business, Description, Security, 
-    TrendingUp, VerifiedUser, Pending, CheckCircle,
+    People, Description, Security, 
+    VerifiedUser, Pending, CheckCircle,
     Draw, AutoFixHigh, Fingerprint, Analytics as AnalyticsIcon,
     Close as CloseIcon
 } from '@mui/icons-material';
-
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://backendmemoire.onrender.com' 
-    : 'http://localhost:8080';
+import API from '../../services/api';  // ← IMPORTANT
 
 const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseDocument }) => {
     const [stats, setStats] = useState({
@@ -37,31 +34,23 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
     });
     const [recentActivities, setRecentActivities] = useState([]);
     const [loading, setLoading] = useState(true);
-    // ⭐ ÉTATS POUR L'ANALYSE IA
     const [openAnalyseDialog, setOpenAnalyseDialog] = useState(false);
     const [documentSelectionne, setDocumentSelectionne] = useState(null);
     
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
-    // Fonction pour les requêtes API avec cookie
+    // Fonction pour les requêtes API avec token
     const fetchAPI = async (endpoint) => {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        try {
+            const response = await API.get(endpoint);
+            return response.data;
+        } catch (error) {
+            console.error(`Erreur fetch ${endpoint}:`, error);
+            throw error;
         }
-        return response.json();
     };
 
-    // ⭐ FONCTION POUR OUVRIR L'ANALYSE D'UN DOCUMENT
     const handleOpenAnalyse = (document) => {
         setDocumentSelectionne(document);
         setOpenAnalyseDialog(true);
@@ -72,11 +61,11 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
             setLoading(true);
             try {
                 const [usersRes, certRes, docsRes, activitiesRes, signaturesRes] = await Promise.all([
-                    fetchAPI('/api/admin/stats/utilisateurs'),
-                    fetchAPI('/api/admin/pki/stats'),
-                    fetchAPI('/api/admin/stats/documents'),
-                    fetchAPI('/api/admin/stats/activites'),
-                    fetchAPI('/api/admin/stats/signatures')
+                    fetchAPI('/admin/stats/utilisateurs'),
+                    fetchAPI('/admin/pki/stats'),
+                    fetchAPI('/admin/stats/documents'),
+                    fetchAPI('/admin/stats/activites'),
+                    fetchAPI('/admin/stats/signatures')
                 ]);
                 
                 setStats({
@@ -212,7 +201,6 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
                                     <Typography variant="body2" fontWeight="bold">{act.action}</Typography>
                                     <Typography variant="caption" color="textSecondary">{act.user}</Typography>
                                     <Typography variant="caption" color="textSecondary">{new Date(act.date).toLocaleString()}</Typography>
-                                    {/* ⭐ BOUTON ANALYSE IA SUR CHAQUE ACTIVITÉ */}
                                     {act.documentId && (
                                         <Button
                                             size="small"
@@ -261,13 +249,13 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
                                         <TableCell>
                                             {act.documentId && (
                                                 <Tooltip title="Analyser le document avec l'IA">
-                                                    <IconButton
+                                                    <MuiIconButton
                                                         size="small"
                                                         color="secondary"
                                                         onClick={() => handleOpenAnalyse({ id: act.documentId, nomFichier: act.documentName || 'Document' })}
                                                     >
                                                         <AnalyticsIcon fontSize="small" />
-                                                    </IconButton>
+                                                    </MuiIconButton>
                                                 </Tooltip>
                                             )}
                                         </TableCell>
@@ -279,7 +267,6 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
                 </TableContainer>
             )}
 
-            {/* ⭐ DIALOG POUR L'ANALYSE IA DU DOCUMENT */}
             <Dialog 
                 open={openAnalyseDialog} 
                 onClose={() => setOpenAnalyseDialog(false)}
@@ -301,12 +288,16 @@ const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseD
                     pb: 1,
                     borderBottom: '1px solid #e0e0e0'
                 }}>
-                  
+                    <Typography variant="h6">Analyse IA du document</Typography>
                     <MuiIconButton onClick={() => setOpenAnalyseDialog(false)} size="small">
                         <CloseIcon />
                     </MuiIconButton>
                 </DialogTitle>
-               
+                <DialogContent>
+                    {documentSelectionne && (
+                        <Typography>Analyse du document : {documentSelectionne.nomFichier}</Typography>
+                    )}
+                </DialogContent>
             </Dialog>
         </Box>
     );

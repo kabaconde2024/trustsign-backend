@@ -5,16 +5,14 @@ import {
     Chip, Tooltip, useMediaQuery, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import { Save, Security, Email, Storage, Refresh, CheckCircle, Cancel, Info, Timer, CalendarToday } from '@mui/icons-material';
-
-// URL de l'API backend
-const API_BASE_URL = 'https://backendmemoire.onrender.com';
+import API from '../../services/api';  // ← IMPORTANT
 
 const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [config, setConfig] = useState({
         pkiCertificatDureeMinutes: 365,
         signatureExpirationJours: 7,
-        signatureExpirationMinutes: 1, // ✅ NOUVEAU : pour le test en minutes
-        expirationMode: 'minutes', // ✅ NOUVEAU : 'minutes' ou 'days'
+        signatureExpirationMinutes: 1,
+        expirationMode: 'minutes',
         emailNotifications: true,
         smsEnabled: true,
         mfaObligatoire: false,
@@ -28,22 +26,25 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
-    // Fonction pour les requêtes API avec cookie
+    // Fonction pour les requêtes API avec token
     const fetchAPI = async (endpoint, options = {}) => {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...options.headers
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        try {
+            const response = await API.get(endpoint);
+            return response.data;
+        } catch (error) {
+            console.error(`Erreur fetch ${endpoint}:`, error);
+            throw error;
         }
-        return response.json();
+    };
+
+    const postAPI = async (endpoint, data) => {
+        try {
+            const response = await API.post(endpoint, data);
+            return response.data;
+        } catch (error) {
+            console.error(`Erreur post ${endpoint}:`, error);
+            throw error;
+        }
     };
 
     useEffect(() => { 
@@ -52,11 +53,11 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
 
     const fetchConfig = async () => {
         try {
-            const data = await fetchAPI('/api/admin/config');
+            const data = await fetchAPI('/admin/config');
             setConfig({
                 ...config,
                 ...data,
-                expirationMode: data.expirationMode || 'minutes' // ✅ Utiliser le mode retourné par l'API
+                expirationMode: data.expirationMode || 'minutes'
             });
         } catch (error) { 
             console.error("Erreur chargement config:", error);
@@ -70,35 +71,28 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
         setLoading(true);
         setSaved(false);
         try {
-            // ✅ Préparer les données à envoyer selon le mode
             const configToSend = {
                 ...config,
-                // Envoyer la bonne valeur selon le mode sélectionné
                 signatureExpirationMinutes: config.expirationMode === 'minutes' ? config.signatureExpirationMinutes : undefined,
                 signatureExpirationJours: config.expirationMode === 'days' ? config.signatureExpirationJours : undefined
             };
             
-            // Nettoyer les undefined
             Object.keys(configToSend).forEach(key => 
                 configToSend[key] === undefined && delete configToSend[key]
             );
             
-            await fetchAPI('/api/admin/config', {
-                method: 'POST',
-                body: JSON.stringify(configToSend)
-            });
-            setSnackbar({ open: true, message: "✅ Configuration sauvegardée avec succès", severity: 'success' });
+            await postAPI('/admin/config', configToSend);
+            if (setSnackbar) setSnackbar({ open: true, message: "✅ Configuration sauvegardée avec succès", severity: 'success' });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (error) {
             console.error("Erreur sauvegarde:", error);
-            setSnackbar({ open: true, message: "❌ Erreur lors de la sauvegarde", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "❌ Erreur lors de la sauvegarde", severity: 'error' });
         } finally { 
             setLoading(false); 
         }
     };
 
-    // ✅ Fonction pour obtenir le texte d'aide selon le mode
     const getExpirationHelperText = () => {
         if (config.expirationMode === 'minutes') {
             return "⏰ TEST MODE: Le lien expirera après ce nombre de MINUTES (actuellement: " + config.signatureExpirationMinutes + " min)";
@@ -106,7 +100,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
         return "📅 Nombre de jours avant expiration du lien de signature (actuellement: " + config.signatureExpirationJours + " jours)";
     };
 
-    // ✅ Fonction pour obtenir la valeur d'expiration affichée
     const getExpirationValue = () => {
         if (config.expirationMode === 'minutes') {
             return config.signatureExpirationMinutes;
@@ -114,7 +107,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
         return config.signatureExpirationJours;
     };
 
-    // ✅ Fonction pour mettre à jour l'expiration
     const handleExpirationChange = (value) => {
         if (config.expirationMode === 'minutes') {
             setConfig({...config, signatureExpirationMinutes: parseInt(value) || 1});
@@ -131,7 +123,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
 
             {saved && <Alert severity="success" sx={{ mb: 3, borderRadius: '12px' }}>Configuration sauvegardée avec succès !</Alert>}
 
-            {/* ✅ ALERTE DE TEST */}
             {config.expirationMode === 'minutes' && config.signatureExpirationMinutes <= 5 && (
                 <Alert severity="warning" sx={{ mb: 3, borderRadius: '12px' }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
@@ -178,7 +169,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
                             <Typography variant={mobile ? "subtitle1" : "h6"} fontWeight="bold">Configuration Signatures</Typography>
                         </Stack>
                         
-                        {/* ✅ SÉLECTEUR MODE EXPIRATION */}
                         <Box sx={{ mb: 3 }}>
                             <Typography variant="caption" color="textSecondary" gutterBottom display="block">
                                 Mode d'expiration des invitations
@@ -202,7 +192,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
                             </ToggleButtonGroup>
                         </Box>
 
-                        {/* Champ d'expiration dynamique */}
                         <TextField 
                             fullWidth 
                             label={config.expirationMode === 'minutes' ? "Expiration (minutes)" : "Expiration (jours)"}
@@ -226,7 +215,6 @@ const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) 
                             color={config.expirationMode === 'minutes' && config.signatureExpirationMinutes <= 5 ? "warning" : "primary"}
                         />
 
-                        {/* Affichage de l'équivalence */}
                         {config.expirationMode === 'minutes' && (
                             <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
                                 <Typography variant="caption">
