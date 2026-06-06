@@ -14,8 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pfe.back_end.configuration.ServiceJwt;
 import pfe.back_end.dto.RequeteConnexion;
-
-
 import pfe.back_end.dto.ReponseAuthentification;
 import pfe.back_end.modeles.entites.Utilisateur;
 import pfe.back_end.repositories.sql.UtilisateurRepository;
@@ -49,17 +47,14 @@ public class ConnexionController {
     @Autowired
     private HttpServletRequest httpServletRequest;
 
-    /*Connexion standard par email/password*/
-
+    /* Connexion standard par email/password */
     @PostMapping("/connexion")
     public ResponseEntity<?> connexion(@RequestBody RequeteConnexion request) {
         try {
             ReponseAuthentification reponse = connexionService.connecter(request);
-            
-
             String jwt = reponse.getAccessToken(); 
 
-            // 2. Création du cookie sécurisé pour le Cross-Domain (Render)
+            // Création du cookie sécurisé pour le Cross-Domain (Render)
             ResponseCookie cookie = ResponseCookie.from("accessToken", jwt)
                     .httpOnly(true)
                     .secure(true)
@@ -70,7 +65,6 @@ public class ConnexionController {
 
             serviceAudit.logConnexion(request.getEmail(), true, "Connexion réussie", httpServletRequest);
 
-            // 3. Retour de la réponse avec le Cookie Set-Cookie
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, cookie.toString())
                     .body(reponse); 
@@ -80,12 +74,11 @@ public class ConnexionController {
         }
     }
 
-    /*Connexion via Google OAuth2 */
-
+    /* Connexion via Google OAuth2 */
     @PostMapping("/auth/google")
     public ResponseEntity<?> authenticateGoogleUser(@RequestBody Map<String, String> payload, HttpServletResponse response) {
+        String idTokenString = payload.get("token");
         try {
-            String idTokenString = payload.get("token");
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                     .setAudience(Collections.singletonList("320659477478-00hgntilql2f933lr33go2tie7b5em2u.apps.googleusercontent.com"))
                     .build();
@@ -107,7 +100,9 @@ public class ConnexionController {
                         .path("/")
                         .maxAge(3600)
                         .build();
-                 response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString()); 
+                
+                // CORRECTION : Suppression de la ligne erronée response.addHeader(..., cookie.toString())
+
                 Map<String, Object> reponseBody = new HashMap<>();
                 reponseBody.put("role", roleName);
                 reponseBody.put("email", user.getEmail());
@@ -122,15 +117,18 @@ public class ConnexionController {
                         .header(HttpHeaders.SET_COOKIE, googleCookie.toString())
                         .body(reponseBody);
             }
+            
+            serviceAudit.logConnexion(null, false, "Authentification Google invalide (Token nul)", httpServletRequest);
             return ResponseEntity.status(401).body(Map.of("erreur", "Authentification Google invalide"));
+            
         } catch (Exception e) {
+            // Essayer d'extraire le token ou une info si possible, sinon null
             serviceAudit.logConnexion(null, false, "Erreur Google: " + e.getMessage(), httpServletRequest);
             return ResponseEntity.status(401).body(Map.of("erreur", e.getMessage()));
         }
     }
 
-    /*Déconnexion par suppression du cookie*/
-
+    /* Déconnexion par suppression du cookie */
     @PostMapping("/deconnexion")
     public ResponseEntity<?> deconnexion() {
         ResponseCookie cookie = ResponseCookie.from("accessToken", "")
@@ -146,8 +144,7 @@ public class ConnexionController {
                 .body(Map.of("message", "Déconnecté."));
     }
 
-    /*Vérification silencieuse de la validité de la session (utilisé par React au refresh) */
-
+    /* Vérification silencieuse de la validité de la session (utilisé par React au refresh) */
     @GetMapping("/auth/check")
     public ResponseEntity<?> verifierSession(HttpServletRequest request) {
         String token = recupererJwtDepuisCookie(request);
