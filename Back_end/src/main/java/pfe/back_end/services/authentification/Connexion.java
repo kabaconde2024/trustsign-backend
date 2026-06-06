@@ -29,7 +29,6 @@ public class Connexion {
         Utilisateur u = utilisateurRepository.findByEmailIgnoreCase(requete.getEmail())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-
         String statut = u.getStatutCycleVie();
 
         if (statut == null || !"ACTIF".equals(statut)) {
@@ -50,6 +49,7 @@ public class Connexion {
             throw new RuntimeException("Identifiants invalides");
         }
 
+        // Génération du code MFA
         String code = String.format("%06d", new Random().nextInt(1000000));
         u.setCodeMfa(code);
 
@@ -57,12 +57,17 @@ public class Connexion {
         u.setExpirationCodeMfa(LocalDateTime.now().plusMinutes(dureeExpirationMinutes));
         utilisateurRepository.save(u);
 
+        // Envoi du code par email
         emailService.envoyerCodeMfa(u.getEmail(), code, dureeExpirationMinutes);
 
+        // Retourne necessiteMfa = true, pas de token ici
         return ReponseAuthentification.builder()
                 .succes(true)
                 .necessiteMfa(true)
                 .email(u.getEmail())
+                .role(u.getRole().name())
+                .prenom(u.getPrenom())
+                .nom(u.getNom())
                 .build();
     }
 }
