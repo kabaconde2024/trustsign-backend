@@ -1,23 +1,33 @@
 import axios from 'axios';
 
-// URL en dur pour tester
-const API_BASE_URL = 'https://backendmemoire.onrender.com';
+const getBaseURL = () => {
+    if (process.env.NODE_ENV === 'production') {
+        return process.env.REACT_APP_API_URL || 'https://backendmemoire.onrender.com';
+    }
+    return 'http://localhost:8080';
+};
 
 const API = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: getBaseURL(),
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
 });
 
-// Intercepteur pour ajouter /api si nécessaire
+// ⚠️ INTERCEPTEUR OBLIGATOIRE - Ajoute le token à chaque requête
 API.interceptors.request.use((config) => {
     const token = localStorage.getItem('accessToken');
+    console.log('[API] Token présent:', !!token);  // ← DEBUG
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('[API] Authorization header ajouté');
     }
-    
+    return config;
+});
+
+// Intercepteur pour ajouter /api si nécessaire
+API.interceptors.request.use((config) => {
     if (!config.url.startsWith('/api') && !config.url.startsWith('http')) {
         config.url = `/api${config.url}`;
     }
@@ -27,7 +37,8 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            console.warn('[API] Authentification error, clearing token');
             localStorage.clear();
             window.location.href = '/';
         }
