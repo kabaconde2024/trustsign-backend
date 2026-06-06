@@ -72,8 +72,11 @@ public class Utilisateur {
     @Column(name = "confirmation_expiration")
     private LocalDateTime confirmationExpiration;
 
+    
+
+
     @Column(name = "confirme")
-    private boolean confirme = false;
+private Boolean confirme = false;
 
     @Column(name = "demande_statut")
     private String demandeStatut = "PENDING";
@@ -84,8 +87,12 @@ public class Utilisateur {
     public LocalDateTime getConfirmationExpiration() { return confirmationExpiration; }
     public void setConfirmationExpiration(LocalDateTime confirmationExpiration) { this.confirmationExpiration = confirmationExpiration; }
 
-    public boolean isConfirme() { return confirme; }
-    public void setConfirme(boolean confirme) { this.confirme = confirme; }
+   
+
+
+
+    public Boolean isConfirme() { return confirme; }
+    public void setConfirme(Boolean confirme) { this.confirme = confirme; }
 
     public String getDemandeStatut() { return demandeStatut; }
     public void setDemandeStatut(String demandeStatut) { this.demandeStatut = demandeStatut; }
