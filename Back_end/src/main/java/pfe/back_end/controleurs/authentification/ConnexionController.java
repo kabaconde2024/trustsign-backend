@@ -29,11 +29,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {
-    "https://localhost:3000",
-    "http://localhost:3000"
-    //"https://trustsign-frontend.onrender.com"
-}, allowCredentials = "true")
 public class ConnexionController {
 
     @Autowired
