@@ -39,7 +39,7 @@ import {
     EventNote as EventNoteIcon
 } from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
 // 🔧 FONCTION POUR LES REQUÊTES AVEC COOKIES (comme dans ConfigurationView)
 const fetchAPI = async (endpoint, options = {}) => {

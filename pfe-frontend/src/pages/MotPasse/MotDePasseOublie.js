@@ -4,9 +4,8 @@ import { Email, Lock, Security } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
 // URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
-// Fonction pour les requêtes API avec cookie
 const fetchAPI = async (endpoint, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,

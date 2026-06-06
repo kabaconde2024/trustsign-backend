@@ -24,7 +24,7 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('http://localhost:8080/api/admin/utilisateurs', { withCredentials: true });
+            const response = await axios.get('https://backendmemoire.onrender.com/api/admin/utilisateurs', { withCredentials: true });
             setUsers(response.data);
             setFilteredUsers(response.data);
         } catch (error) {
@@ -47,7 +47,7 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const handleRoleChange = async () => {
         if (!selectedUser || !newRole) return;
         try {
-            await axios.put(`http://localhost:8080/api/admin/utilisateurs/${selectedUser.id}/role`, { role: newRole }, { withCredentials: true });
+            await axios.put(`https://backendmemoire.onrender.com/api/admin/utilisateurs/${selectedUser.id}/role`, { role: newRole }, { withCredentials: true });
             setSnackbar({ open: true, message: `Rôle de ${selectedUser.prenom} ${selectedUser.nom} mis à jour`, severity: 'success' });
             setOpenDialog(false);
             fetchUsers();
@@ -59,7 +59,7 @@ const UtilisateursView = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const handleToggleStatus = async (userId, currentStatus) => {
         const newStatus = currentStatus === 'ACTIF' ? 'INACTIF' : 'ACTIF';
         try {
-            await axios.put(`http://localhost:8080/api/admin/utilisateurs/${userId}/status`, { statut: newStatus }, { withCredentials: true });
+            await axios.put(`https://backendmemoire.onrender.com/api/admin/utilisateurs/${userId}/status`, { statut: newStatus }, { withCredentials: true });
             setSnackbar({ open: true, message: `Compte ${newStatus === 'ACTIF' ? 'activé' : 'désactivé'}`, severity: 'success' });
             fetchUsers();
         } catch (error) {

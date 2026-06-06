@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material';
 
 // URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
 // Fonction pour les requêtes API avec cookie
 const fetchAPI = async (endpoint, options = {}) => {

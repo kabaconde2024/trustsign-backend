@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, Button, CircularProgress } from '@mui/material';
 import { CheckCircle, Error } from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
 const ConfirmerCertificat = () => {
     const [searchParams] = useSearchParams();

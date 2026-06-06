@@ -9,7 +9,7 @@ import {
 } from '@mui/icons-material';
 
 // URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
 const VerificationCertificat = () => {
     const [loading, setLoading] = useState(false);

@@ -54,7 +54,7 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
     const handleSavePhoto = async () => {
         setUploading(true);
         try {
-            await axios.post('http://localhost:8080/api/utilisateur/upload-photo', 
+            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
                 { photo: tempPhoto },
                 { withCredentials: true }
             );
@@ -72,7 +72,7 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
     const handleDeletePhoto = async () => {
         setUploading(true);
         try {
-            await axios.post('http://localhost:8080/api/utilisateur/upload-photo', 
+            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
                 { photo: null },
                 { withCredentials: true }
             );

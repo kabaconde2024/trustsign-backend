@@ -15,7 +15,7 @@ const ListeDocumentsAutoSignes = ({ setSnackbar, isMobile = false }) => {
     const [downloading, setDownloading] = useState({});
     const [deleting, setDeleting] = useState({});
 
-    const API_BASE_URL = 'http://localhost:8080/api/documents';
+    const API_BASE_URL = 'https://backendmemoire.onrender.com/api/documents';
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const isTablet = useMediaQuery('(max-width:960px)');
     const mobile = isMobile || isSmallScreen;

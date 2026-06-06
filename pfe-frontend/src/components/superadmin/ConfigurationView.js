@@ -7,7 +7,7 @@ import {
 import { Save, Security, Email, Storage, Refresh, CheckCircle, Cancel, Info, Timer, CalendarToday } from '@mui/icons-material';
 
 // URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
 
 const ConfigurationView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [config, setConfig] = useState({

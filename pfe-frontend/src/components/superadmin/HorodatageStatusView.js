@@ -19,7 +19,7 @@ const HorodatageStatusView = ({ setSnackbar, isMobile = false, isTablet = false 
     const fetchStatus = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('http://localhost:8080/api/horodatage/statut', { withCredentials: true });
+            const response = await axios.get('https://backendmemoire.onrender.com/api/horodatage/statut', { withCredentials: true });
             setStatus(response.data);
         } catch (error) {
             console.error("Erreur:", error);
@@ -30,7 +30,7 @@ const HorodatageStatusView = ({ setSnackbar, isMobile = false, isTablet = false 
     const testerHorodatage = async () => {
         setTesting(true);
         try {
-            const response = await axios.post('http://localhost:8080/api/horodatage/tester', { data: testData || "Test automatique" }, { withCredentials: true });
+            const response = await axios.post('https://backendmemoire.onrender.com/api/horodatage/tester', { data: testData || "Test automatique" }, { withCredentials: true });
             setTestResult(response.data);
             setSnackbar({ open: true, message: response.data.success ? "Test réussi ✅" : "Test échoué ❌", severity: response.data.success ? 'success' : 'error' });
         } catch (error) {

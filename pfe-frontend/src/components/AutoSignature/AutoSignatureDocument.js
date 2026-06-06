@@ -8,7 +8,7 @@ import DetecteurFalsification from '../IA/DetecteurFalsification';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'https://backendmemoire.onrender.com/api';
 
 const AutoSignatureDocument = ({ setSnackbar, isMobile = false }) => {
     const [file, setFile] = useState(null);

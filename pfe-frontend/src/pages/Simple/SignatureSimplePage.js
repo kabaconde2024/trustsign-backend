@@ -1,5 +1,4 @@
-// src/pages/Simple/SignatureSimplePage.jsx
-// Version SIMPLE UNIQUEMENT - Pas de code PKI
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -15,10 +14,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 
-// Configuration du worker PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Gestionnaire pour l'erreur ResizeObserver
 const handleResizeObserverError = (e) => {
     if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
         e.stopImmediatePropagation();
@@ -50,16 +47,13 @@ const SignatureSimplePage = () => {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [downloadedFileName, setDownloadedFileName] = useState('');
     
-    // États pour le résumé IA
     const [contenuDocument, setContenuDocument] = useState('');
     const [nomDocument, setNomDocument] = useState('');
     const [showResume, setShowResume] = useState(false);
     const [resumeLoading, setResumeLoading] = useState(false);
     
-    // 🆕 État pour le détecteur de falsification
     const [fichierBlob, setFichierBlob] = useState(null);
     
-    // États pour le dialogue d'erreur
     const [errorDialog, setErrorDialog] = useState({
         open: false,
         title: '',
@@ -67,7 +61,6 @@ const SignatureSimplePage = () => {
         details: null
     });
     
-    // Responsive states
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [isTablet, setIsTablet] = useState(window.innerWidth <= 1024 && window.innerWidth > 768);
 
@@ -84,7 +77,6 @@ const SignatureSimplePage = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // DEBUG: Surveiller les changements d'état
     useEffect(() => {
         console.log("🔍 ÉTATS RESUME:", {
             showResume,
@@ -94,7 +86,6 @@ const SignatureSimplePage = () => {
         });
     }, [showResume, resumeLoading, contenuDocument, nomDocument]);
 
-    // 🆕 Convertir le PDF en fichier pour le détecteur de falsification
     useEffect(() => {
         const convertirPdfEnFichier = async () => {
             if (pdfUrl && nomDocument) {
@@ -103,9 +94,9 @@ const SignatureSimplePage = () => {
                     const blob = await response.blob();
                     const fichier = new File([blob], nomDocument, { type: 'application/pdf' });
                     setFichierBlob(fichier);
-                    console.log("✅ PDF converti en fichier pour analyse de falsification");
+                    console.log("PDF converti en fichier pour analyse de falsification");
                 } catch (error) {
-                    console.error("❌ Erreur conversion PDF:", error);
+                    console.error("Erreur conversion PDF:", error);
                 }
             }
         };
@@ -133,7 +124,7 @@ const SignatureSimplePage = () => {
 
     const extraireTexteDuPDF = async (url) => {
         try {
-            console.log("📄 Extraction du texte depuis:", url);
+            console.log("Extraction du texte depuis:", url);
             
             const response = await axios.get(url, {
                 responseType: 'arraybuffer',
@@ -147,7 +138,7 @@ const SignatureSimplePage = () => {
             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
             const pdf = await loadingTask.promise;
             
-            console.log(`✅ PDF chargé: ${pdf.numPages} pages`);
+            console.log(`PDF chargé: ${pdf.numPages} pages`);
             
             let texteComplet = '';
             const maxPages = Math.min(pdf.numPages, 3);
@@ -157,11 +148,11 @@ const SignatureSimplePage = () => {
                 const textContent = await page.getTextContent();
                 const pageText = textContent.items.map(item => item.str).join(' ');
                 texteComplet += pageText + '\n';
-                console.log(`📝 Page ${i} extraite (${pageText.length} caractères)`);
+                console.log(`Page ${i} extraite (${pageText.length} caractères)`);
             }
             
             const resultat = texteComplet.substring(0, 3000);
-            console.log(`✅ Extraction terminée: ${resultat.length} caractères`);
+            console.log(`Extraction terminée: ${resultat.length} caractères`);
             
             if (resultat.length < 50) {
                 return "Document sans texte extractible (peut être scanné ou composé d'images).";
@@ -170,7 +161,7 @@ const SignatureSimplePage = () => {
             return resultat;
             
         } catch (error) {
-            console.error("❌ Erreur extraction:", error);
+            console.error("Erreur extraction:", error);
             return "Le texte du document n'a pas pu être extrait automatiquement. Utilisez le bouton 'Générer' pour essayer l'analyse IA.";
         }
     };
@@ -179,8 +170,8 @@ const SignatureSimplePage = () => {
         const fetchDetails = async () => {
             try {
                 setLoading(true);
-                console.log("1️⃣ Récupération des détails de l'invitation...");
-                const res = await axios.get(`http://localhost:8080/api/signature/details/${token}`);
+                console.log("Récupération des détails de l'invitation...");
+                const res = await axios.get(`https://backendmemoire.onrender.com/api/signature/details/${token}`);
                 
                 if (res.data.dateExpiration && new Date(res.data.dateExpiration) < new Date()) {
                     alert("Cette invitation a expiré. Veuillez contacter l'expéditeur pour une nouvelle invitation.");
@@ -190,25 +181,20 @@ const SignatureSimplePage = () => {
                 
                 setInvitation(res.data);
                 setSignatureText(`${res.data.prenomSignataire} ${res.data.nomSignataire}`);
-                const pdfUrlTemp = `http://localhost:8080/api/signature/apercu/${token}`;
+                const pdfUrlTemp = `https://backendmemoire.onrender.com/api/signature/apercu/${token}`;
                 setPdfUrl(pdfUrlTemp);
                 setNomDocument(res.data.nomDocument || 'document.pdf');
                 
-                console.log("2️⃣ Activation de l'affichage du résumé...");
                 setShowResume(true);
                 setResumeLoading(true);
                 
-                console.log("3️⃣ Tentative d'extraction du texte...");
                 try {
                     const texte = await extraireTexteDuPDF(pdfUrlTemp);
-                    console.log("4️⃣ Texte extrait, longueur:", texte.length);
                     setContenuDocument(texte);
                 } catch (extractError) {
-                    console.warn("5️⃣ Extraction échouée, mais le composant s'affichera quand même");
                     setContenuDocument("");
                 } finally {
                     setResumeLoading(false);
-                    console.log("6️⃣ Chargement terminé, showResume=", true, "resumeLoading=", false);
                 }
                 
             } catch (err) {
@@ -270,7 +256,6 @@ const SignatureSimplePage = () => {
         const xPx = clientX - rect.left;
         const yPx = clientY - rect.top;
 
-        console.log(`🎯 Cible verrouillée ! Page: ${actualPageNumber}, X: ${xPx}, Y: ${yPx}`);
 
         setSelectedPosition({ 
             x: xPx,
@@ -291,11 +276,11 @@ const SignatureSimplePage = () => {
         
         try {
             setLoading(true);
-            await axios.post(`http://localhost:8080/api/signature/send-otp?token=${token}`);
+            await axios.post(`https://backendmemoire.onrender.com/api/signature/send-otp?token=${token}`);
             setIsOtpSent(true);
-            alert(`✅ Code de sécurité envoyé à : ${invitation.emailDestinataire}`);
+            alert(`Code de sécurité envoyé à : ${invitation.emailDestinataire}`);
         } catch (err) {
-            alert("❌ Erreur lors de l'envoi de l'email.");
+            alert(" Erreur lors de l'envoi de l'email.");
         } finally {
             setLoading(false);
         }
@@ -388,7 +373,7 @@ const SignatureSimplePage = () => {
             };
 
             const response = await axios.post(
-                'http://localhost:8080/api/signature/valider-simple', 
+                'https://backendmemoire.onrender.com/api/signature/valider-simple', 
                 payload, 
                 { responseType: 'blob' }
             );
@@ -444,7 +429,7 @@ const SignatureSimplePage = () => {
             } else {
                 setErrorDialog({
                     open: true,
-                    title: "❌ Signature impossible",
+                    title: "Signature impossible",
                     message: errorMessage,
                     details: errorDetails?.message || "Vérifiez vos informations et réessayez."
                 });
@@ -565,7 +550,6 @@ const SignatureSimplePage = () => {
                 </Box>
             )}
 
-            {/* 🆕 DÉTECTEUR DE FALSIFICATION */}
             {showResume && !resumeLoading && fichierBlob && (
                 <Box sx={{ mt: 2, mb: 2, mx: isMobile ? 1 : 3 }}>
                     <DetecteurFalsification 
@@ -573,8 +557,7 @@ const SignatureSimplePage = () => {
                         onAnalyseComplete={(resultat) => {
                             console.log('🔍 Analyse falsification terminée:', resultat);
                             if (resultat.scoreIntegrite < 50) {
-                                // Alerte silencieuse dans la console
-                                console.warn('⚠️ Document suspect détecté! Score:', resultat.scoreIntegrite);
+                                console.warn('Document suspect détecté! Score:', resultat.scoreIntegrite);
                             }
                         }}
                     />
@@ -631,7 +614,7 @@ const SignatureSimplePage = () => {
                                 <button onClick={() => setSignatureMode('draw')} style={{ ...btnIconStyle, backgroundColor: signatureMode === 'draw' ? '#e9ecef' : '#fff', padding: isMobile ? '6px 10px' : '8px 12px', fontSize: isMobile ? '14px' : '18px' }}>✏️</button>
                                 <button onClick={() => setSignatureMode('text')} style={{ ...btnIconStyle, backgroundColor: signatureMode === 'text' ? '#e9ecef' : '#fff', padding: isMobile ? '6px 10px' : '8px 12px', fontSize: isMobile ? '14px' : '18px' }}>📝 Texte</button>
                                 <label style={{ ...btnIconStyle, cursor: 'pointer', backgroundColor: signatureMode === 'upload' ? '#e9ecef' : '#fff', padding: isMobile ? '6px 10px' : '8px 12px', fontSize: isMobile ? '14px' : '18px' }}>
-                                    🖼️ <input type="file" hidden onChange={handleImageUpload} accept="image/*" />
+                                    <input type="file" hidden onChange={handleImageUpload} accept="image/*" />
                                 </label>
                             </div>
 

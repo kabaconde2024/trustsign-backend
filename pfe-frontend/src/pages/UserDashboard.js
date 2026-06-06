@@ -57,7 +57,7 @@ const UserDashboard = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/utilisateur/mon-profil', { withCredentials: true });
+      const response = await axios.get('https://backendmemoire.onrender.com/api/utilisateur/mon-profil', { withCredentials: true });
       setUserData(response.data);
     } catch (error) { 
       console.error("Erreur profil:", error); 
@@ -67,7 +67,7 @@ const UserDashboard = () => {
   const fetchTransactions = async () => {
     setLoadingTransactions(true);
     try {
-      const response = await axios.get('http://localhost:8080/api/documents/mes-invitations', { withCredentials: true });
+      const response = await axios.get('https://backendmemoire.onrender.com/api/documents/mes-invitations', { withCredentials: true });
       setTransactions(response.data);
     } catch (error) {
       setSnackbar({ open: true, message: "Erreur lors de la récupération des transactions.", severity: 'error' });
@@ -86,7 +86,7 @@ const UserDashboard = () => {
   
   const handleUpdateProfil = async () => {
     try {
-      await axios.put('http://localhost:8080/api/utilisateur/modifier-profil', userData, { withCredentials: true });
+      await axios.put('https://backendmemoire.onrender.com/api/utilisateur/modifier-profil', userData, { withCredentials: true });
       setSnackbar({ open: true, message: 'Profil mis à jour !', severity: 'success' });
       setIsEditing(false);
     } catch (error) {
@@ -100,7 +100,7 @@ const UserDashboard = () => {
       return;
     }
     try {
-      await axios.put('http://localhost:8080/api/utilisateur/modifier-mot-de-passe', {
+      await axios.put('https://backendmemoire.onrender.com/api/utilisateur/modifier-mot-de-passe', {
         ancienMotDePasse: passwordData.oldPassword,
         nouveauMotDePasse: passwordData.newPassword
       }, { withCredentials: true });
@@ -125,7 +125,7 @@ const UserDashboard = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const uploadResponse = await axios.post('http://localhost:8080/api/documents/upload', formData, {
+      const uploadResponse = await axios.post('https://backendmemoire.onrender.com/api/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         withCredentials: true
       });
@@ -142,7 +142,7 @@ const UserDashboard = () => {
         typeSignature: typeSig
       };
       
-      await axios.post('http://localhost:8080/api/signature/creer-transaction', payload, { withCredentials: true });
+      await axios.post('https://backendmemoire.onrender.com/api/signature/creer-transaction', payload, { withCredentials: true });
       
       setSnackbar({ 
         open: true, 

@@ -32,7 +32,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
             // 🔥 CORRECTION : Récupérer les infos même si EXPIRED
             if (currentStatus === 'ACTIVE' || currentStatus === 'EXPIRED') {
                 try {
-                    const res = await axios.get('http://localhost:8080/api/utilisateur/pki/mon-statut', { withCredentials: true });
+                    const res = await axios.get('https://backendmemoire.onrender.com/api/utilisateur/pki/mon-statut', { withCredentials: true });
                     setCertInfo(res.data);
                     if (res.data.dateExpiration) {
                         const expirationDate = new Date(res.data.dateExpiration);
@@ -53,7 +53,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const handleRequest = async () => {
         setLoading(true);
         try {
-            await axios.post('http://localhost:8080/api/utilisateur/pki/request-certificate', {}, { withCredentials: true });
+            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/pki/request-certificate', {}, { withCredentials: true });
             setSnackbar({ open: true, message: "✅ Votre demande de certificat a été transmise avec succès.", severity: 'success' });
             if (onStatusRefresh) onStatusRefresh();
         } catch (error) {
@@ -65,7 +65,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const handleRenew = async () => {
         setRenewLoading(true);
         try {
-            await axios.post('http://localhost:8080/api/utilisateur/pki/renouveler-certificat', {}, { withCredentials: true });
+            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/pki/renouveler-certificat', {}, { withCredentials: true });
             setSnackbar({ open: true, message: "✅ Votre demande de renouvellement a été enregistrée.", severity: 'success' });
             if (onStatusRefresh) onStatusRefresh();
         } catch (error) {

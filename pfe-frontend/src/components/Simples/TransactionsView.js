@@ -74,7 +74,7 @@ const TransactionsView = ({ invitations, loading, onDocumentClick }) => {
   const handleDownload = async (documentId, nomFichier, typeSignature) => {
     setDownloading(prev => ({ ...prev, [documentId]: true }));
     try {
-      const endpoint = `http://localhost:8080/api/documents/download-signe/${documentId}`;
+      const endpoint = `https://backendmemoire.onrender.com/api/documents/download-signe/${documentId}`;
       const response = await axios.get(endpoint, {
         responseType: 'blob',
         withCredentials: true
@@ -99,7 +99,7 @@ const TransactionsView = ({ invitations, loading, onDocumentClick }) => {
   const verifierSignature = async (documentId, nomFichier, typeSignature) => {
     try {
       const response = await axios.post(
-        'http://localhost:8080/api/documents/verifier-document-signe',
+        'https://backendmemoire.onrender.com/api/documents/verifier-document-signe',
         { documentId: documentId, typeSignature: typeSignature },
         { withCredentials: true }
       );

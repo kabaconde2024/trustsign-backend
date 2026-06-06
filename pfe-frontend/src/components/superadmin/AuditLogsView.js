@@ -14,6 +14,9 @@ import PendingIcon from '@mui/icons-material/Pending';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import CloseIcon from '@mui/icons-material/Close';
 
+// URL du backend Render
+const API_BASE_URL = 'https://backendmemoire.onrender.com';
+
 const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,7 +24,6 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [filterUserEmail, setFilterUserEmail] = useState('');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(20);
-    // ⭐ ÉTATS POUR L'ANALYSE IA
     const [openAnalyseDialog, setOpenAnalyseDialog] = useState(false);
     const [documentSelectionne, setDocumentSelectionne] = useState(null);
     
@@ -31,18 +33,35 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const eventTypes = ['SIGNATURE_DOCUMENT', 'ENVOI_INVITATION', 'GENERATION_CERTIFICAT', 'DEMANDE_CERTIFICAT', 'APPROBATION_CERTIFICAT', 'RENOUVELLEMENT_CERTIFICAT', 'VALIDATION_OTP', 'AUTO_SIGNATURE', 'INSCRIPTION', 'CONNEXION', 'ACTIVATION_COMPTE'];
 
     const getStatusColor = (status) => {
-        switch(status) { case 'SUCCESS': return 'success'; case 'FAILED': return 'error'; case 'PENDING': return 'warning'; default: return 'default'; }
+        switch(status) { 
+            case 'SUCCESS': return 'success'; 
+            case 'FAILED': return 'error'; 
+            case 'PENDING': return 'warning'; 
+            default: return 'default'; 
+        }
     };
 
     const getEventTypeLabel = (type) => {
-        const labels = { 'SIGNATURE_DOCUMENT': 'Signature document', 'ENVOI_INVITATION': 'Envoi invitation', 'GENERATION_CERTIFICAT': 'Génération certificat', 'DEMANDE_CERTIFICAT': 'Demande certificat', 'APPROBATION_CERTIFICAT': 'Approbation certificat', 'RENOUVELLEMENT_CERTIFICAT': 'Renouvellement certificat', 'VALIDATION_OTP': 'Validation OTP', 'AUTO_SIGNATURE': 'Auto-signature', 'INSCRIPTION': 'Inscription', 'CONNEXION': 'Connexion', 'ACTIVATION_COMPTE': 'Activation compte' };
+        const labels = { 
+            'SIGNATURE_DOCUMENT': 'Signature document', 
+            'ENVOI_INVITATION': 'Envoi invitation', 
+            'GENERATION_CERTIFICAT': 'Génération certificat', 
+            'DEMANDE_CERTIFICAT': 'Demande certificat', 
+            'APPROBATION_CERTIFICAT': 'Approbation certificat', 
+            'RENOUVELLEMENT_CERTIFICAT': 'Renouvellement certificat', 
+            'VALIDATION_OTP': 'Validation OTP', 
+            'AUTO_SIGNATURE': 'Auto-signature', 
+            'INSCRIPTION': 'Inscription', 
+            'CONNEXION': 'Connexion', 
+            'ACTIVATION_COMPTE': 'Activation compte' 
+        };
         return labels[type] || type;
     };
 
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            let url = 'http://localhost:8080/api/admin/audit/logs';
+            let url = `${API_BASE_URL}/api/admin/audit/logs`;
             const params = [];
             if (filterUserEmail) params.push(`userEmail=${encodeURIComponent(filterUserEmail)}`);
             if (filterEventType) params.push(`eventType=${filterEventType}`);
@@ -55,7 +74,6 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
         } finally { setLoading(false); }
     };
 
-    // ⭐ FONCTION POUR OUVRIR L'ANALYSE D'UN DOCUMENT
     const handleOpenAnalyse = (document) => {
         setDocumentSelectionne(document);
         setOpenAnalyseDialog(true);
@@ -65,7 +83,14 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
-        return new Date(dateString).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return new Date(dateString).toLocaleString('fr-FR', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
     };
 
     return (
@@ -77,25 +102,46 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
                 </Stack>
 
                 <Stack direction={mobile ? "column" : "row"} spacing={2} mb={3}>
-                    <TextField label="Type d'événement" select value={filterEventType} onChange={(e) => setFilterEventType(e.target.value)} size="small" fullWidth={mobile} sx={{ minWidth: mobile ? 'auto' : 250 }}><MenuItem value="">Tous</MenuItem>{eventTypes.map(type => (<MenuItem key={type} value={type}>{getEventTypeLabel(type)}</MenuItem>))}</TextField>
-                    <TextField label="Email utilisateur" value={filterUserEmail} onChange={(e) => setFilterUserEmail(e.target.value)} placeholder="exemple@email.com" size="small" fullWidth={mobile} sx={{ minWidth: mobile ? 'auto' : 250 }} />
+                    <TextField 
+                        label="Type d'événement" 
+                        select 
+                        value={filterEventType} 
+                        onChange={(e) => setFilterEventType(e.target.value)} 
+                        size="small" 
+                        fullWidth={mobile} 
+                        sx={{ minWidth: mobile ? 'auto' : 250 }}
+                    >
+                        <MenuItem value="">Tous</MenuItem>
+                        {eventTypes.map(type => (<MenuItem key={type} value={type}>{getEventTypeLabel(type)}</MenuItem>))}
+                    </TextField>
+                    <TextField 
+                        label="Email utilisateur" 
+                        value={filterUserEmail} 
+                        onChange={(e) => setFilterUserEmail(e.target.value)} 
+                        placeholder="exemple@email.com" 
+                        size="small" 
+                        fullWidth={mobile} 
+                        sx={{ minWidth: mobile ? 'auto' : 250 }} 
+                    />
                 </Stack>
 
-                {loading ? <Box display="flex" justifyContent="center" p={5}><CircularProgress /></Box> : logs.length === 0 ? <Alert severity="info">Aucun log trouvé</Alert> : mobile ? (
+                {loading ? <Box display="flex" justifyContent="center" p={5}><CircularProgress /></Box> : 
+                 logs.length === 0 ? <Alert severity="info">Aucun log trouvé</Alert> : 
+                 mobile ? (
                     <Stack spacing={2}>
                         {logs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((log) => (
                             <Card key={log.id} sx={{ p: 2 }}>
                                 <Stack spacing={1}>
                                     <Stack direction="row" justifyContent="space-between">
                                         <Chip label={getEventTypeLabel(log.eventType)} size="small" variant="outlined" />
-                                        <Chip label={log.status || 'UNKNOWN'} size="small" color={getStatusColor(log.status)} icon={log.status === 'SUCCESS' ? <CheckCircleIcon /> : log.status === 'FAILED' ? <ErrorIcon /> : <PendingIcon />} />
+                                        <Chip label={log.status || 'UNKNOWN'} size="small" color={getStatusColor(log.status)} 
+                                              icon={log.status === 'SUCCESS' ? <CheckCircleIcon /> : log.status === 'FAILED' ? <ErrorIcon /> : <PendingIcon />} />
                                     </Stack>
                                     <Typography variant="caption" color="textSecondary">{formatDate(log.timestamp)}</Typography>
                                     <Typography variant="body2"><strong>{log.userEmail || '-'}</strong></Typography>
                                     <Typography variant="caption">{log.documentName || '-'}</Typography>
                                     {log.signatureType && <Chip label={log.signatureType} size="small" variant="outlined" />}
                                     <Typography variant="caption" color="textSecondary">{log.details || '-'}</Typography>
-                                    {/* ⭐ BOUTON ANALYSE IA */}
                                     {log.documentId && (
                                         <Button
                                             size="small"
@@ -115,7 +161,18 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
                     <>
                         <TableContainer sx={{ maxHeight: '70vh' }}>
                             <Table size="small" stickyHeader>
-                                <TableHead><TableRow sx={{ bgcolor: '#f5f5f5' }}><TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Événement</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Utilisateur</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Document</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Type signature</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Statut</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Détails</TableCell><TableCell sx={{ fontWeight: 'bold' }}>Analyse IA</TableCell></TableRow></TableHead>
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Événement</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Utilisateur</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Document</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Type signature</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Statut</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Détails</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Analyse IA</TableCell>
+                                    </TableRow>
+                                </TableHead>
                                 <TableBody>
                                     {logs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((log) => (
                                         <TableRow key={log.id} hover>
@@ -124,7 +181,10 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
                                             <TableCell>{log.userEmail || '-'}</TableCell>
                                             <TableCell>{log.documentName || '-'}</TableCell>
                                             <TableCell>{log.signatureType ? <Chip label={log.signatureType} size="small" variant="outlined" /> : '-'}</TableCell>
-                                            <TableCell><Chip label={log.status || 'UNKNOWN'} size="small" color={getStatusColor(log.status)} icon={log.status === 'SUCCESS' ? <CheckCircleIcon /> : log.status === 'FAILED' ? <ErrorIcon /> : <PendingIcon />} /></TableCell>
+                                            <TableCell>
+                                                <Chip label={log.status || 'UNKNOWN'} size="small" color={getStatusColor(log.status)} 
+                                                      icon={log.status === 'SUCCESS' ? <CheckCircleIcon /> : log.status === 'FAILED' ? <ErrorIcon /> : <PendingIcon />} />
+                                            </TableCell>
                                             <TableCell><Typography variant="caption">{log.details || '-'}</Typography></TableCell>
                                             <TableCell>
                                                 {log.documentId && (
@@ -144,12 +204,20 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        <TablePagination rowsPerPageOptions={[10, 20, 50, 100]} component="div" count={logs.length} rowsPerPage={rowsPerPage} page={page} onPageChange={(e, newPage) => setPage(newPage)} onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }} labelRowsPerPage="Lignes par page" />
+                        <TablePagination 
+                            rowsPerPageOptions={[10, 20, 50, 100]} 
+                            component="div" 
+                            count={logs.length} 
+                            rowsPerPage={rowsPerPage} 
+                            page={page} 
+                            onPageChange={(e, newPage) => setPage(newPage)} 
+                            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }} 
+                            labelRowsPerPage="Lignes par page" 
+                        />
                     </>
                 )}
             </Paper>
 
-            {/* ⭐ DIALOG POUR L'ANALYSE IA DU DOCUMENT */}
             <Dialog 
                 open={openAnalyseDialog} 
                 onClose={() => setOpenAnalyseDialog(false)}
@@ -179,7 +247,9 @@ const AuditLogsView = ({ setSnackbar, isMobile = false, isTablet = false }) => {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent sx={{ p: { xs: 2, sm: 3 }, overflowY: 'auto' }}>
-                  
+                    {documentSelectionne && (
+                        <Typography>Analyse du document : {documentSelectionne.nomFichier}</Typography>
+                    )}
                 </DialogContent>
             </Dialog>
         </Box>

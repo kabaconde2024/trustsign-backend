@@ -14,8 +14,9 @@ import {
     Close as CloseIcon
 } from '@mui/icons-material';
 
-// URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+    ? 'https://backendmemoire.onrender.com' 
+    : 'http://localhost:8080';
 
 const StatsView = ({ setSnackbar, isMobile = false, isTablet = false, onAnalyseDocument }) => {
     const [stats, setStats] = useState({

@@ -22,7 +22,7 @@ const UploadDocument = () => {
         try {
             setStatus('Téléchargement et hachage en cours...');
             
-            const response = await axios.post('http://localhost:8080/api/documents/upload', formData, {
+            const response = await axios.post('https://backendmemoire.onrender.com/api/documents/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
