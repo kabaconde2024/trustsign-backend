@@ -1,13 +1,13 @@
 # --- Étape 1 : Build React ---
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /build
 
 # Copier les fichiers de dépendances
 COPY package*.json ./
 
-# Installer les dépendances
-RUN npm ci --only=production && npm cache clean --force
+# Installer les dépendances (npm install au lieu de npm ci)
+RUN npm install && npm cache clean --force
 
 # Copier le code source
 COPY . ./
