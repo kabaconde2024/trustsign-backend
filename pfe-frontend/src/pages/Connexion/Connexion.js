@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     Box, TextField, Button, Alert, InputAdornment, 
     CircularProgress, Typography, Link, Divider, useMediaQuery,
-    Stack  // ✅ AJOUTER Stack ici
+    Stack  
 } from '@mui/material';
 import { Lock, Email, Security } from '@mui/icons-material';
 import API from '../../services/api';
@@ -37,19 +37,21 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
         }
     };
 
-    const redirectUserByRole = (role) => {
+  const redirectUserByRole = (role) => {
+        // 1. Gestion du chemin de redirection (Query Parameter)
         if (redirectPath && redirectPath !== '/' && !redirectPath.includes('/connexion')) {
-            navigate(decodeURIComponent(redirectPath));
+            navigate(decodeURIComponent(redirectPath), { replace: true });
             return;
         }
 
+        // 2. Gestion des redirections par défaut selon le rôle
         const activeRole = role || localStorage.getItem('role'); 
 
-        if (activeRole === 'SUPER_ADMIN') navigate('/super-admin-dashboard');
-        else if (activeRole === 'ADMIN_ENTREPRISE') navigate('/admin-dashboard');
-        else if (activeRole === 'EMPLOYE') navigate('/employe-dashboard');
-        else if (activeRole === 'UTILISATEUR') navigate('/user-dashboard');
-        else navigate('/user-dashboard');
+        if (activeRole === 'SUPER_ADMIN') navigate('/super-admin-dashboard', { replace: true });
+        else if (activeRole === 'ADMIN_ENTREPRISE') navigate('/admin-dashboard', { replace: true });
+        else if (activeRole === 'EMPLOYE') navigate('/employe-dashboard', { replace: true });
+        else if (activeRole === 'UTILISATEUR') navigate('/user-dashboard', { replace: true });
+        else navigate('/user-dashboard', { replace: true });
     };
 
     const handleLogin = async () => {
@@ -72,8 +74,9 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
                     email: email
                 }));
                 
+                // On met à jour l'état de l'application et on redirige DIRECTEMENT
                 if (onLoginSuccess) onLoginSuccess();
-                setTimeout(() => redirectUserByRole(response.data.role), 1000);
+                redirectUserByRole(response.data.role);
             }
         } catch (err) {
             const errorMessage = err.response?.data?.erreur || err.response?.data?.message || "Identifiants incorrects.";
@@ -101,7 +104,7 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
             }));
 
             if (onLoginSuccess) onLoginSuccess();
-            setTimeout(() => redirectUserByRole(response.data.role), 1000);
+            redirectUserByRole(response.data.role); // Suppression du setTimeout
         } catch (err) {
             const errorMessage = err.response?.data?.erreur || "Code OTP invalide ou expiré.";
             setError(errorMessage);
@@ -125,7 +128,7 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
             }));
 
             if (onLoginSuccess) onLoginSuccess();
-            setTimeout(() => redirectUserByRole(response.data.role), 1000);
+            redirectUserByRole(response.data.role); // Suppression du setTimeout
         } catch (err) {
             const errorMessage = err.response?.data?.erreur || "Échec de la connexion avec Google.";
             setError(errorMessage);
