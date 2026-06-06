@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
 
-// URL de l'API backend
-const API_BASE_URL = 'http://localhost:8080';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 const PrivateRoute = ({ children, allowedRoles }) => {
     const [isAuthorized, setIsAuthorized] = useState(null);

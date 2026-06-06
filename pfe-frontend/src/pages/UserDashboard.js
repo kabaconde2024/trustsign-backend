@@ -83,6 +83,7 @@ const UserDashboard = () => {
     }
   };
 
+  
   const handleUpdateProfil = async () => {
     try {
       await axios.put('http://localhost:8080/api/utilisateur/modifier-profil', userData, { withCredentials: true });
