@@ -1,80 +1,46 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { CircularProgress, Box } from '@mui/material';
-
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+import React, { useState, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import API from '../services/api'; // <--- ASSUREZ-VOUS DE METTRE LE BON CHEMIN VERS VOTRE FICHIER API.JS
 
 const PrivateRoute = ({ children, allowedRoles }) => {
-    const [isAuthorized, setIsAuthorized] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(null);
     const [userRole, setUserRole] = useState(null);
+    const location = useLocation();
 
     useEffect(() => {
-        let isMounted = true;
-
-        const checkAuth = async () => {
+        const verifierAuthentification = async () => {
             try {
-                // Utilisation de fetch avec credentials pour envoyer le cookie
-                const response = await fetch(`${API_BASE_URL}/api/auth/check`, {
-                    method: 'GET',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
+                // On utilise l'instance API globale (qui cible automatiquement Render en prod)
+                const response = await API.get('/auth/check');
                 
-                if (!isMounted) return;
-
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    if (data.authentifie) {
-                        const role = data.role;
-                        setUserRole(role);
-                        
-                        // Vérification du rôle
-                        if (allowedRoles && allowedRoles.length > 0) {
-                            if (!allowedRoles.includes(role)) {
-                                console.warn(`[Auth] Rôle insuffisant: ${role}`);
-                                setIsAuthorized(false);
-                                return;
-                            }
-                        }
-                        
-                        console.log(`[Auth] ✅ Accès accordé pour: ${role}`);
-                        setIsAuthorized(true);
-                    } else {
-                        console.warn('[Auth] Session invalide ou expirée');
-                        setIsAuthorized(false);
-                    }
+                if (response.data && response.data.authenticated) {
+                    setIsAuthenticated(true);
+                    setUserRole(response.data.role);
                 } else {
-                    console.warn('[Auth] Session invalide ou expirée');
-                    setIsAuthorized(false);
+                    setIsAuthenticated(false);
                 }
             } catch (error) {
-                console.error('[Auth] Erreur lors de la vérification du cookie:', error.message);
-                if (isMounted) setIsAuthorized(false);
+                console.error("[Auth] Erreur lors de la vérification du cookie:", error);
+                setIsAuthenticated(false);
             }
         };
 
-        checkAuth();
+        verifierAuthentification();
+    }, []);
 
-        return () => {
-            isMounted = false;
-        };
-    }, [allowedRoles]);
-
-    if (isAuthorized === null) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <CircularProgress size={60} />
-            </Box>
-        );
+    // Gestion du chargement pendant la vérification
+    if (isAuthenticated === null) {
+        return <div>Chargement...</div>; 
     }
 
-    if (!isAuthorized) {
-        return <Navigate to="/" replace />;
+    // Si pas authentifié, redirection vers la page de connexion
+    if (!isAuthenticated) {
+        return <Navigate to={`/connexion?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+    }
+
+    // Si le rôle n'est pas autorisé, redirection vers une page d'erreur ou d'accueil
+    if (allowedRoles && !allowedRoles.includes(userRole)) {
+        return <Navigate to="/non-autorise" replace />;
     }
 
     return children;
