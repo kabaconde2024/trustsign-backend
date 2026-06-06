@@ -2,10 +2,10 @@ import axios from 'axios';
 
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        // Ne pas ajouter /api ici car il est déjà dans REACT_APP_API_URL ou sera ajouté dans les appels
+        // Ne pas ajouter /api ici, il sera ajouté dans les appels
         return process.env.REACT_APP_API_URL;
     }
-    return 'http://localhost:8080/api';
+    return 'http://localhost:8080';
 };
 
 const API = axios.create({
@@ -15,6 +15,15 @@ const API = axios.create({
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
+});
+
+// Intercepteur pour ajouter /api à toutes les requêtes
+API.interceptors.request.use((config) => {
+    // Ajoute /api si ce n'est pas déjà fait
+    if (!config.url.startsWith('/api') && !config.url.startsWith('http')) {
+        config.url = `/api${config.url}`;
+    }
+    return config;
 });
 
 API.interceptors.response.use(
