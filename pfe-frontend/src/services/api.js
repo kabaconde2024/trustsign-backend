@@ -2,10 +2,10 @@ import axios from 'axios';
 
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        // En production, on cible directement l'URL publique du backend.
-        // On y ajoute /api pour centraliser la base URL.
-        const url = process.env.REACT_APP_API_URL || process.env.VITE_API_URL;
-        return `${url}/api`;
+        // On récupère la variable que vous venez de valider
+        const url = process.env.REACT_APP_API_URL;
+        // On s'assure d'ajouter /api à la fin si la variable ne le contient pas
+        return url ? `${url}/api` : 'https://backendmemoire.onrender.com/api';
     }
     // En développement local
     return 'http://localhost:8080/api';
@@ -20,10 +20,8 @@ const API = axios.create({
     }
 });
 
-// Intercepteur ajusté : évite d'ajouter un doublon de '/api' 
-// puisque la baseURL le contient déjà désormais.
+// Intercepteur pour nettoyer les requêtes et éviter les doublons de /api
 API.interceptors.request.use((config) => {
-    // Si la requête commence par /api, on nettoie pour éviter d'avoir /api/api/...
     if (config.url.startsWith('/api')) {
         config.url = config.url.replace('/api', '');
     }
