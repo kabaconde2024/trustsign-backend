@@ -2,10 +2,13 @@ import axios from 'axios';
 
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        // Ne pas ajouter /api ici, il sera ajouté dans les appels
-        return process.env.REACT_APP_API_URL;
+        // En production, on cible directement l'URL publique du backend.
+        // On y ajoute /api pour centraliser la base URL.
+        const url = process.env.REACT_APP_API_URL || process.env.VITE_API_URL;
+        return `${url}/api`;
     }
-    return 'http://localhost:8080';
+    // En développement local
+    return 'http://localhost:8080/api';
 };
 
 const API = axios.create({
@@ -17,11 +20,12 @@ const API = axios.create({
     }
 });
 
-// Intercepteur pour ajouter /api à toutes les requêtes
+// Intercepteur ajusté : évite d'ajouter un doublon de '/api' 
+// puisque la baseURL le contient déjà désormais.
 API.interceptors.request.use((config) => {
-    // Ajoute /api si ce n'est pas déjà fait
-    if (!config.url.startsWith('/api') && !config.url.startsWith('http')) {
-        config.url = `/api${config.url}`;
+    // Si la requête commence par /api, on nettoie pour éviter d'avoir /api/api/...
+    if (config.url.startsWith('/api')) {
+        config.url = config.url.replace('/api', '');
     }
     return config;
 });
