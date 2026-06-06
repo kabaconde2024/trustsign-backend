@@ -2,17 +2,18 @@ import axios from 'axios';
 
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        return `${process.env.REACT_APP_API_URL}/api`;
+        // Ne pas ajouter /api ici car il est déjà dans REACT_APP_API_URL ou sera ajouté dans les appels
+        return process.env.REACT_APP_API_URL;
     }
     return 'http://localhost:8080/api';
-    
 };
 
 const API = axios.create({
     baseURL: getBaseURL(),
     withCredentials: true,
     headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
     }
 });
 
