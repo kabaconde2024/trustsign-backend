@@ -1,44 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import API from '../services/api'; // <--- ASSUREZ-VOUS DE METTRE LE BON CHEMIN VERS VOTRE FICHIER API.JS
+import { CircularProgress, Box } from '@mui/material';
+import API from '../services/api';
 
 const PrivateRoute = ({ children, allowedRoles }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(null);
+    const [isAuthorized, setIsAuthorized] = useState(null);
     const [userRole, setUserRole] = useState(null);
     const location = useLocation();
 
     useEffect(() => {
         const verifierAuthentification = async () => {
             try {
-                // On utilise l'instance API globale (qui cible automatiquement Render en prod)
-                const response = await API.get('/auth/check');
+                const token = localStorage.getItem('accessToken');
                 
-                if (response.data && response.data.authenticated) {
-                    setIsAuthenticated(true);
+                if (!token) {
+                    setIsAuthorized(false);
+                    return;
+                }
+                
+                const response = await API.get('/auth/check', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.data && response.data.authentifie) {
+                    setIsAuthorized(true);
                     setUserRole(response.data.role);
                 } else {
-                    setIsAuthenticated(false);
+                    setIsAuthorized(false);
                 }
             } catch (error) {
-                console.error("[Auth] Erreur lors de la vérification du cookie:", error);
-                setIsAuthenticated(false);
+                console.error("[Auth] Erreur:", error);
+                setIsAuthorized(false);
             }
         };
 
         verifierAuthentification();
     }, []);
 
-    // Gestion du chargement pendant la vérification
-    if (isAuthenticated === null) {
-        return <div>Chargement...</div>; 
+    if (isAuthorized === null) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress size={60} />
+            </Box>
+        );
     }
 
-    // Si pas authentifié, redirection vers la page de connexion
-    if (!isAuthenticated) {
+    if (!isAuthorized) {
         return <Navigate to={`/connexion?redirect=${encodeURIComponent(location.pathname)}`} replace />;
     }
 
-    // Si le rôle n'est pas autorisé, redirection vers une page d'erreur ou d'accueil
     if (allowedRoles && !allowedRoles.includes(userRole)) {
         return <Navigate to="/non-autorise" replace />;
     }

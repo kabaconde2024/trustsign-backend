@@ -37,14 +37,12 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
         }
     };
 
-  const redirectUserByRole = (role) => {
-        // 1. Gestion du chemin de redirection (Query Parameter)
+    const redirectUserByRole = (role) => {
         if (redirectPath && redirectPath !== '/' && !redirectPath.includes('/connexion')) {
             navigate(decodeURIComponent(redirectPath), { replace: true });
             return;
         }
 
-        // 2. Gestion des redirections par défaut selon le rôle
         const activeRole = role || localStorage.getItem('role'); 
 
         if (activeRole === 'SUPER_ADMIN') navigate('/super-admin-dashboard', { replace: true });
@@ -67,6 +65,12 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
                 setIsMfaRequired(true);
                 setError('');
             } else {
+                // Stocker le token dans localStorage
+                const accessToken = response.data.accessToken;
+                if (accessToken) {
+                    localStorage.setItem('accessToken', accessToken);
+                }
+                
                 localStorage.setItem('role', response.data.role);
                 localStorage.setItem('user_info', JSON.stringify({
                     prenom: response.data.prenom,
@@ -74,7 +78,6 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
                     email: email
                 }));
                 
-                // On met à jour l'état de l'application et on redirige DIRECTEMENT
                 if (onLoginSuccess) onLoginSuccess();
                 redirectUserByRole(response.data.role);
             }
@@ -96,6 +99,12 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
                 code: otpCode.trim() 
             });
             
+            // Stocker le token dans localStorage
+            const accessToken = response.data.accessToken;
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+            }
+            
             localStorage.setItem('role', response.data.role);
             localStorage.setItem('user_info', JSON.stringify({
                 prenom: response.data.prenom,
@@ -104,7 +113,7 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
             }));
 
             if (onLoginSuccess) onLoginSuccess();
-            redirectUserByRole(response.data.role); // Suppression du setTimeout
+            redirectUserByRole(response.data.role);
         } catch (err) {
             const errorMessage = err.response?.data?.erreur || "Code OTP invalide ou expiré.";
             setError(errorMessage);
@@ -120,6 +129,11 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
         try {
             const response = await API.post('/auth/google', { token: googleData.credential });
 
+            const accessToken = response.data.accessToken;
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+            }
+
             localStorage.setItem('role', response.data.role);
             localStorage.setItem('user_info', JSON.stringify({
                 prenom: response.data.prenom,
@@ -128,7 +142,7 @@ const Connexion = ({ onSwitch, onLoginSuccess }) => {
             }));
 
             if (onLoginSuccess) onLoginSuccess();
-            redirectUserByRole(response.data.role); // Suppression du setTimeout
+            redirectUserByRole(response.data.role);
         } catch (err) {
             const errorMessage = err.response?.data?.erreur || "Échec de la connexion avec Google.";
             setError(errorMessage);
