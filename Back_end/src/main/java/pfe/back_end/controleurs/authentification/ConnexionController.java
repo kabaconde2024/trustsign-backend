@@ -107,7 +107,7 @@ public class ConnexionController {
                         .path("/")
                         .maxAge(3600)
                         .build();
-
+                 response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString()); 
                 Map<String, Object> reponseBody = new HashMap<>();
                 reponseBody.put("role", roleName);
                 reponseBody.put("email", user.getEmail());
