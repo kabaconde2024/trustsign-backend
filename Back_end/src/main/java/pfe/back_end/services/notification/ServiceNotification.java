@@ -23,7 +23,7 @@ public class ServiceNotification {
     @Autowired
     private TemplateEngine templateEngine;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url:https://frontendmemoire.onrender.com}")
     private String frontendUrl;
 
     private final String EXPEDITEUR_EMAIL = "kabaconde5259@gmail.com";
