@@ -16,9 +16,7 @@ import java.util.Optional;
 @Repository
 public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> {
 
-
     Optional<Utilisateur> findByEmailIgnoreCase(String email);
-
     Optional<Utilisateur> findByEmail(String email);
     boolean existsByEmail(String email);
     Optional<Utilisateur> findByTokenActivation(String token);
@@ -27,6 +25,11 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     List<Utilisateur> findAllByStatusPki(String statusPki);
     Optional<Utilisateur> findByEmailAndStatutCycleVie(String email, String statutCycleVie);
     Optional<Utilisateur> findByConfirmationToken(String token);
+    
+    // ⭐ AJOUTER CES 5 MÉTHODES POUR LES STATISTIQUES
+    long countByStatusPki(String statusPki);
+    long count();
+    
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.confirmationToken = :token, u.confirmationExpiration = :expiration, u.demandeStatut = 'AWAITING_CONFIRMATION' WHERE u.id = :userId")
