@@ -20,7 +20,7 @@ import java.util.Collections;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Remplacant moderne de @EnableGlobalMethodSecurity
+@EnableMethodSecurity
 public class ConfigurationSecurite {
 
     @Autowired
@@ -74,15 +74,19 @@ public class ConfigurationSecurite {
                                 "/api/ia/securite/verifier-integrite-rapide"
                         ).permitAll()
 
-                        // 4. ENDPOINTS ADMIN AUDIT
+                        // 4. ENDPOINTS ADMIN AUDIT EXEMPTÉS (Déclarés avant la règle globale /api/admin/**)
                         .requestMatchers(
                                 "/api/admin/audit/ia-data",
                                 "/api/admin/audit/test"
                         ).permitAll()
 
-                        // 5. PROTECTION PAR RÔLES CONTRAINTS (.hasRole attend implicitement le préfixe ROLE_)
-                        .requestMatchers("/api/entreprise/**").hasRole("ADMIN_ENTREPRISE")
-                        .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
+                        // 5. PROTECTION PAR AUTORITÉS (hasAuthority)
+                        .requestMatchers("/api/entreprise/**").hasAuthority("ADMIN_ENTREPRISE")
+                        .requestMatchers("/api/super-admin/**").hasAuthority("SUPER_ADMIN")
+                        
+                        // Tout ce qui commence par /api/admin/ requiert l'autorité SUPER_ADMIN 
+                        // (Englobe automatiquement /api/admin/stats/**, /api/admin/pki/**, etc.)
+                        .requestMatchers("/api/admin/**").hasAuthority("SUPER_ADMIN")
 
                         // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION SIMPLE
                         .requestMatchers(
