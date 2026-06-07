@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/admin")
 @CrossOrigin(origins = {
         "https://localhost:3000",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://frontendmemoire.onrender.com"
 }, allowCredentials = "true")
 public class SuperAdminController {
 
@@ -37,8 +38,6 @@ public class SuperAdminController {
 
     @Autowired
     private ServiceConfiguration serviceConfiguration;
-
-
 
     @GetMapping("/stats/utilisateurs")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
@@ -96,7 +95,6 @@ public class SuperAdminController {
         return ResponseEntity.ok(activites);
     }
 
-
     @GetMapping("/stats/signatures")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<Map<String, Long>> getStatsSignatures() {
@@ -127,21 +125,9 @@ public class SuperAdminController {
         return ResponseEntity.ok(stats);
     }
 
-
-    @GetMapping("/pki/stats")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-    public ResponseEntity<Map<String, Long>> getPkiStats() {
-        List<Utilisateur> allUsers = utilisateurRepository.findAll();
-
-        Map<String, Long> stats = new HashMap<>();
-        stats.put("pending", allUsers.stream().filter(u -> "PENDING".equals(u.getStatusPki())).count());
-        stats.put("active", allUsers.stream().filter(u -> "ACTIVE".equals(u.getStatusPki())).count());
-        stats.put("expired", allUsers.stream().filter(u -> "EXPIRED".equals(u.getStatusPki())).count());
-        stats.put("none", allUsers.stream().filter(u -> u.getStatusPki() == null || "NONE".equals(u.getStatusPki())).count());
-
-        return ResponseEntity.ok(stats);
-    }
-
+    // ⭐ MÉTHODE SUPPRIMÉE : getPkiStats() (déplacée vers PkiAdminController)
+    // Pour éviter le conflit de routes avec PkiAdminController.getStats()
+    // L'endpoint /api/admin/pki/stats est maintenant géré par PkiAdminController
 
     @GetMapping("/utilisateurs")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
@@ -200,7 +186,7 @@ public class SuperAdminController {
         }
     }
 
-    /*Méthode utilitaire pour parser une valeur de configuration en entieravec gestion des valeurs nulles */
+    /* Méthode utilitaire pour parser une valeur de configuration en entier avec gestion des valeurs nulles */
     private int parseConfigValue(String cle, int defaultValue) {
         try {
             String valeur = serviceConfiguration.getValeur(cle);
@@ -315,7 +301,6 @@ public class SuperAdminController {
             return ResponseEntity.status(500).body(Map.of("erreur", e.getMessage()));
         }
     }
-
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
