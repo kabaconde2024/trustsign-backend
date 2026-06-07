@@ -20,15 +20,38 @@ const ConfirmerCertificat = () => {
         const confirmer = async () => {
             try {
                 console.log("🔍 Confirmation du token:", token);
+                
+                // ✅ CORRECTION : Ajouter le token d'authentification dans l'en-tête
+                const accessToken = localStorage.getItem('accessToken');
+                
                 const response = await fetch(`${API_BASE_URL}/api/admin/pki/confirmer-identite?token=${token}`, {
-                    credentials: 'include'
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+                    }
                 });
-                const data = await response.json();
+                
+                // ✅ CORRECTION : Gérer les erreurs HTTP correctement
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    console.error("Réponse non-JSON:", text);
+                    throw new Error("Réponse invalide du serveur");
+                }
+                
                 console.log("📡 Réponse:", data);
                 setResult(data);
             } catch (error) {
                 console.error("❌ Erreur:", error);
-                setResult({ status: 'error', message: "Erreur de connexion" });
+                setResult({ 
+                    status: 'error', 
+                    message: error.message || "Erreur de connexion au serveur" 
+                });
             } finally {
                 setLoading(false);
             }
