@@ -42,7 +42,6 @@ private Provider initialiserFournisseur() {
                 configContent = "name = SoftHSM2\nlibrary = C:/SoftHSM2/lib/softhsm2-x64.dll\nslot = 0\n";
             } else {
                 // --- CONFIGURATION SÉCURISÉE POUR RENDER (LINUX) ---
-                // On utilise /tmp ou le home de l'application pour s'assurer d'avoir les droits d'écriture
                 String appRoot = "/tmp/softhsm_runtime";
                 File softhsmDir = new File(appRoot);
                 File tokensDir = new File(softhsmDir, "tokens");
@@ -52,7 +51,6 @@ private Provider initialiserFournisseur() {
                     tokensDir.mkdirs();
                 }
                 
-                // 1. Générer dynamiquement le fichier de configuration système pour la lib native .so
                 if (!systemConfFile.exists()) {
                     String confContent = "directories.tokendir = " + tokensDir.getAbsolutePath() + "\n" +
                                          "objectstore.backend = file\n" +
@@ -60,36 +58,50 @@ private Provider initialiserFournisseur() {
                     Files.writeString(systemConfFile.toPath(), confContent);
                 }
                 
-                // 2. Forcer la propriété système pour la librairie native
                 System.setProperty("SOFTHSM2_CONF", systemConfFile.getAbsolutePath());
                 
-                // 3. Si aucun token n'est présent, on l'initialise à la volée via la commande système
+                // Correction de la commande d'initialisation du Token (utilisation de --free + vérification des logs)
                 if (tokensDir.list() == null || tokensDir.list().length == 0) {
-                    System.out.println("⚠️ Aucun jeton détecté. Initialisation du Slot 0 de SoftHSM2...");
+                    System.out.println("⚠️ Aucun jeton détecté. Initialisation d'un emplacement SoftHSM2 libre...");
                     ProcessBuilder pb = new ProcessBuilder(
-                        "softhsm2-util", "--init-token", "--slot", "0", 
+                        "softhsm2-util", "--init-token", "--free", 
                         "--label", "TrustSignToken", "--pin", pinUtilisateur, "--so-pin", "123456"
                     );
+                    pb.redirectErrorStream(true);
                     Process process = pb.start();
+                    
+                    // Lire le flux pour éviter que le processus ne reste bloqué
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println("[SoftHSM2-Init] " + line);
+                    }
                     process.waitFor();
                 }
 
-                // 4. Contenu du fichier de configuration PKCS11 destiné à Java SunPKCS11
+                // Détection dynamique du chemin de la librairie SoftHSM2 si le premier choix échoue
+                String libPath = "/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so";
+                if (!new File(libPath).exists()) {
+                    if (new File("/usr/local/lib/softhsm/libsofthsm2.so").exists()) {
+                        libPath = "/usr/local/lib/softhsm/libsofthsm2.so";
+                    } else if (new File("/usr/lib/libsofthsm2.so").exists()) {
+                        libPath = "/usr/lib/libsofthsm2.so";
+                    }
+                }
+
                 configContent = "name = SoftHSM2\n" +
-                                "library = /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so\n" +
-                                "slot = 0\n" +
+                                "library = " + libPath + "\n" +
+                                "slotListIndex = 0\n" + // Utilisation de slotListIndex au lieu de slot fixe pour s'aligner avec '--free'
                                 "attributes(*, CKO_SECRET_KEY, *) = {\n" +
                                 "  CKA_ENCRYPT = true\n" +
                                 "  CKA_DECRYPT = true\n" +
                                 "}\n";
             }
             
-            // Écriture du fichier de configuration PKCS11 temporaire de Java
             File tempConfig = File.createTempFile("pkcs11_java", ".cfg");
             Files.writeString(tempConfig.toPath(), configContent);
             tempConfig.deleteOnExit();
             
-            // Nettoyage de l'ancien provider s'il existe
             Provider oldProvider = Security.getProvider("SunPKCS11-SoftHSM2");
             if (oldProvider != null) {
                 Security.removeProvider("SunPKCS11-SoftHSM2");
@@ -101,7 +113,7 @@ private Provider initialiserFournisseur() {
             
             testHSMConnection();
             hsmInitialized = true;
-            System.out.println("✅ Module PKCS11 configuré et connecté au Slot 0");
+            System.out.println("✅ Module PKCS11 configuré et connecté via slotListIndex 0");
             
         } catch (Exception e) {
             System.err.println("❌ Échec critique de l'initialisation du fournisseur PKCS11: " + e.getMessage());
