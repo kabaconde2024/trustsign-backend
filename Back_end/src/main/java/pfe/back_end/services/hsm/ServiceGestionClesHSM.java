@@ -32,47 +32,85 @@ public class ServiceGestionClesHSM {
         return initialiserFournisseur();
     }
 
-    private Provider initialiserFournisseur() {
-        if (fournisseurPKCS11 == null || !hsmInitialized) {
-            try {
-                String configContent;
-                String os = System.getProperty("os.name").toLowerCase();
+private Provider initialiserFournisseur() {
+    if (fournisseurPKCS11 == null || !hsmInitialized) {
+        try {
+            String configContent;
+            String os = System.getProperty("os.name").toLowerCase();
+            
+            if (os.contains("win")) {
+                configContent = "name = SoftHSM2\nlibrary = C:/SoftHSM2/lib/softhsm2-x64.dll\nslot = 0\n";
+            } else {
+                // --- CONFIGURATION SÉCURISÉE POUR RENDER (LINUX) ---
+                // On utilise /tmp ou le home de l'application pour s'assurer d'avoir les droits d'écriture
+                String appRoot = "/tmp/softhsm_runtime";
+                File softhsmDir = new File(appRoot);
+                File tokensDir = new File(softhsmDir, "tokens");
+                File systemConfFile = new File(softhsmDir, "softhsm2.conf");
                 
-                if (os.contains("win")) {
-                    configContent = "name = SoftHSM2\nlibrary = C:/SoftHSM2/lib/softhsm2-x64.dll\nslot = 0\n";
-                } else {
-                    // Configuration pour Render/Linux
-                    configContent = "name = SoftHSM2\nlibrary = /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so\nslot = 0\n";
+                if (!tokensDir.exists()) {
+                    tokensDir.mkdirs();
                 }
                 
-                File tempConfig = File.createTempFile("pkcs11", ".cfg");
-                Files.writeString(tempConfig.toPath(), configContent);
-                tempConfig.deleteOnExit();
-                
-                // Nettoyer l'ancien provider si existant
-                Provider oldProvider = Security.getProvider("SunPKCS11-SoftHSM2");
-                if (oldProvider != null) {
-                    Security.removeProvider("SunPKCS11-SoftHSM2");
+                // 1. Générer dynamiquement le fichier de configuration système pour la lib native .so
+                if (!systemConfFile.exists()) {
+                    String confContent = "directories.tokendir = " + tokensDir.getAbsolutePath() + "\n" +
+                                         "objectstore.backend = file\n" +
+                                         "log.level = ERROR\n";
+                    Files.writeString(systemConfFile.toPath(), confContent);
                 }
                 
-                Provider p = Security.getProvider("SunPKCS11");
-                fournisseurPKCS11 = p.configure(tempConfig.getAbsolutePath());
-                Security.addProvider(fournisseurPKCS11);
+                // 2. Forcer la propriété système pour la librairie native
+                System.setProperty("SOFTHSM2_CONF", systemConfFile.getAbsolutePath());
                 
-                // Tester la connexion au HSM
-                testHSMConnection();
-                
-                hsmInitialized = true;
-                System.out.println("✅ HSM initialisé avec succès");
-                
-            } catch (Exception e) {
-                System.err.println("❌ Erreur initialisation HSM: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("Erreur PKCS11 : " + e.getMessage(), e);
+                // 3. Si aucun token n'est présent, on l'initialise à la volée via la commande système
+                if (tokensDir.list() == null || tokensDir.list().length == 0) {
+                    System.out.println("⚠️ Aucun jeton détecté. Initialisation du Slot 0 de SoftHSM2...");
+                    ProcessBuilder pb = new ProcessBuilder(
+                        "softhsm2-util", "--init-token", "--slot", "0", 
+                        "--label", "TrustSignToken", "--pin", pinUtilisateur, "--so-pin", "123456"
+                    );
+                    Process process = pb.start();
+                    process.waitFor();
+                }
+
+                // 4. Contenu du fichier de configuration PKCS11 destiné à Java SunPKCS11
+                configContent = "name = SoftHSM2\n" +
+                                "library = /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so\n" +
+                                "slot = 0\n" +
+                                "attributes(*, CKO_SECRET_KEY, *) = {\n" +
+                                "  CKA_ENCRYPT = true\n" +
+                                "  CKA_DECRYPT = true\n" +
+                                "}\n";
             }
+            
+            // Écriture du fichier de configuration PKCS11 temporaire de Java
+            File tempConfig = File.createTempFile("pkcs11_java", ".cfg");
+            Files.writeString(tempConfig.toPath(), configContent);
+            tempConfig.deleteOnExit();
+            
+            // Nettoyage de l'ancien provider s'il existe
+            Provider oldProvider = Security.getProvider("SunPKCS11-SoftHSM2");
+            if (oldProvider != null) {
+                Security.removeProvider("SunPKCS11-SoftHSM2");
+            }
+            
+            Provider p = Security.getProvider("SunPKCS11");
+            fournisseurPKCS11 = p.configure(tempConfig.getAbsolutePath());
+            Security.addProvider(fournisseurPKCS11);
+            
+            testHSMConnection();
+            hsmInitialized = true;
+            System.out.println("✅ Module PKCS11 configuré et connecté au Slot 0");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Échec critique de l'initialisation du fournisseur PKCS11: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erreur PKCS11 : " + e.getMessage(), e);
         }
-        return fournisseurPKCS11;
     }
+    return fournisseurPKCS11;
+}
     
     private void testHSMConnection() {
         try {
