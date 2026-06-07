@@ -1,17 +1,17 @@
-// components/superadmin/AdminCertificats.js - Version Alignée (Cookies & Token)
+// components/superadmin/AdminCertificats.js - Version URL Directe (Option A)
 import React, { useState, useEffect } from 'react';
 import { 
     Box, Grid, Card, CardContent, Typography, Stack, 
     Avatar, LinearProgress, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Chip,
-    Tooltip, useMediaQuery, Button, Dialog, DialogTitle, 
+    useMediaQuery, Button, Dialog, DialogTitle, 
     DialogContent, IconButton as MuiIconButton
 } from '@mui/material';
 import { 
-    VerifiedUser, Pending, Shield, FactCheck, 
+    VerifiedUser, Pending, Shield, 
     Cancel, Close as CloseIcon
 } from '@mui/icons-material';
-import API from '../../services/api';  // ← Transmet automatiquement les cookies/tokens
+import axios from 'axios'; // ← Importation directe d'axios
 
 const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [certStats, setCertStats] = useState({
@@ -29,37 +29,42 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
-    // Même abstraction que StatsView : l'instance API porte les cookies/tokens de session
-    const fetchAPI = async (endpoint) => {
-        try {
-            const response = await API.get(endpoint);
-            return response.data;
-        } catch (error) {
-            console.error(`Erreur fetch ${endpoint}:`, error);
-            throw error;
-        }
+    // URL du backend sur Render définie en dur
+    const BACKEND_URL = 'https://backendmemoire.onrender.com/api';
+
+    // Configuration manuelle des en-têtes avec le Token pour les requêtes de lecture
+    const getHeaders = () => {
+        const token = localStorage.getItem('token');
+        return {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
     };
 
     const loadData = async () => {
         setLoading(true);
         try {
-            // Les cookies de session/tokens sont joints automatiquement ici
+            // Requêtes HTTP directes vers Render avec injection manuelle du token
             const [statsRes, listRes] = await Promise.all([
-                fetchAPI('/admin/pki/stats'),
-                fetchAPI('/admin/pki/certificats')
+                axios.get(`${BACKEND_URL}/admin/pki/stats`, { headers: getHeaders() }),
+                axios.get(`${BACKEND_URL}/admin/pki/certificats`, { headers: getHeaders() })
             ]);
 
             setCertStats({
-                totalCertificates: statsRes.total || 0,
-                activeCertificates: statsRes.active || 0,
-                pendingCertificates: statsRes.pending || 0,
-                revokedCertificates: statsRes.revoked || 0
+                totalCertificates: statsRes.data.total || 0,
+                activeCertificates: statsRes.data.active || 0,
+                pendingCertificates: statsRes.data.pending || 0,
+                revokedCertificates: statsRes.data.revoked || 0
             });
-            setCertificatesList(listRes || []);
+            setCertificatesList(listRes.data || []);
         } catch (error) {
-            console.error("Erreur chargement données PKI:", error);
+            console.error("Erreur chargement données PKI via URL directe:", error);
             if (setSnackbar) {
-                setSnackbar({ open: true, message: "Erreur d'authentification ou de chargement", severity: 'error' });
+                setSnackbar({ 
+                    open: true, 
+                    message: "Erreur d'authentification ou accès refusé (403)", 
+                    severity: 'error' 
+                });
             }
         } finally {
             setLoading(false);
@@ -78,8 +83,12 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
 
     const handleProcessAction = async (id, statusAction) => {
         try {
-            // Appel PUT utilisant la même instance API sécurisée par cookie/token
-            await API.put(`/admin/pki/certificats/${id}`, { status: statusAction });
+            // Appel PUT direct vers Render utilisant les en-têtes d'autorisation manuels
+            await axios.put(
+                `${BACKEND_URL}/admin/pki/certificats/${id}`, 
+                { status: statusAction },
+                { headers: getHeaders() }
+            );
             
             if (setSnackbar) {
                 setSnackbar({ 
@@ -89,9 +98,9 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
                 });
             }
             setOpenActionDialog(false);
-            loadData(); // Rafraîchissement automatique du registre
+            loadData(); // Rechargement forcé du registre
         } catch (error) {
-            console.error("Erreur lors de la modification du statut:", error);
+            console.error("Erreur modification statut via URL directe:", error);
             if (setSnackbar) {
                 setSnackbar({ open: true, message: "Action non autorisée ou erreur serveur", severity: 'error' });
             }
@@ -158,7 +167,6 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
             </Typography>
             
             {mobile ? (
-                /* Layout Cartes pour Mobile */
                 <Stack spacing={2}>
                     {certificatesList.length === 0 ? (
                         <Paper sx={{ p: 3, textAlign: 'center' }}>
@@ -205,7 +213,6 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
                     )}
                 </Stack>
             ) : (
-                /* Layout Tableau pour Desktop/Tablette */
                 <TableContainer component={Paper} sx={{ borderRadius: '12px', overflowX: 'auto' }}>
                     <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f5f5f5' }}>
@@ -259,7 +266,6 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
                 </TableContainer>
             )}
 
-            {/* Boîte de Dialogue pour les Actions (Validation / Révocation) */}
             <Dialog 
                 open={openActionDialog} 
                 onClose={() => setOpenActionDialog(false)}
