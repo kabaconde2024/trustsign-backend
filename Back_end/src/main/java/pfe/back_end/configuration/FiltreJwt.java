@@ -36,9 +36,10 @@ public class FiltreJwt extends OncePerRequestFilter {
                 String role = jwtUtils.getRoleFromToken(token);
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // Standardisation stricte : Spring Security s'attend à "ROLE_NOM_DU_ROLE"
-                    String nomAutorite = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(nomAutorite);
+                    
+                    // ⭐ CORRECTION : On utilise directement le rôle brut ("SUPER_ADMIN") 
+                    // fourni par le token ou la base, sans lui coller "ROLE_"
+                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(role);
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             email, null, Collections.singletonList(authority)
