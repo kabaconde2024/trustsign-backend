@@ -52,7 +52,9 @@ public class ConfigurationSecurite {
                                 "/api/reinitialiser-mot-de-passe",
                                 "/api/horodatage/statut",
                                 "/api/auth/check",
-                                "/api/debug/**"
+                                "/api/debug/**",
+                                "/api/admin/pki/confirmer-identite"  // ← AJOUTER CETTE LIGNE
+
                         ).permitAll()
 
                         // 2. ENDPOINTS DE SIGNATURE PUBLICS

@@ -24,17 +24,20 @@ const VerificationCertificat = () => {
         setLoading(true);
         setResultat(null);
         try {
+            // ✅ CORRECTION : Récupérer le token d'authentification
+            const token = localStorage.getItem('accessToken');
+            
             const response = await fetch(`${API_BASE_URL}/api/pki/verifier-mon-certificat`, {
                 method: 'GET',
-                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 }
             });
             
             if (!response.ok) {
-                const errorData = await response.json();
+                const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.erreur || `HTTP ${response.status}`);
             }
             
