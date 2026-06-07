@@ -27,12 +27,24 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
+    // 🛠️ Centralisation de la récupération du Token JWT
+    const getHeaders = () => {
+        const token = localStorage.getItem('token');
+        return {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+    };
+
     useEffect(() => {
         const fetchCertificat = async () => {
-            // 🔥 CORRECTION : Récupérer les infos même si EXPIRED
             if (currentStatus === 'ACTIVE' || currentStatus === 'EXPIRED') {
                 try {
-                    const res = await axios.get('https://backendmemoire.onrender.com/api/utilisateur/pki/mon-statut', { withCredentials: true });
+                    // 🔄 Remplacement de withCredentials par l'en-tête Authorization
+                    const res = await axios.get(
+                        'https://backendmemoire.onrender.com/api/utilisateur/pki/mon-statut', 
+                        { headers: getHeaders() }
+                    );
                     setCertInfo(res.data);
                     if (res.data.dateExpiration) {
                         const expirationDate = new Date(res.data.dateExpiration);
@@ -53,7 +65,12 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const handleRequest = async () => {
         setLoading(true);
         try {
-            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/pki/request-certificate', {}, { withCredentials: true });
+            // 🔄 Injection du token JWT pour la demande de certificat
+            await axios.post(
+                'https://backendmemoire.onrender.com/api/utilisateur/pki/request-certificate', 
+                {}, 
+                { headers: getHeaders() }
+            );
             setSnackbar({ open: true, message: "✅ Votre demande de certificat a été transmise avec succès.", severity: 'success' });
             if (onStatusRefresh) onStatusRefresh();
         } catch (error) {
@@ -65,7 +82,12 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const handleRenew = async () => {
         setRenewLoading(true);
         try {
-            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/pki/renouveler-certificat', {}, { withCredentials: true });
+            // 🔄 Injection du token JWT pour le renouvellement
+            await axios.post(
+                'https://backendmemoire.onrender.com/api/utilisateur/pki/renouveler-certificat', 
+                {}, 
+                { headers: getHeaders() }
+            );
             setSnackbar({ open: true, message: "✅ Votre demande de renouvellement a été enregistrée.", severity: 'success' });
             if (onStatusRefresh) onStatusRefresh();
         } catch (error) {
@@ -111,11 +133,9 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
     const isActive = currentStatus === 'ACTIVE';
     const isPending = currentStatus === 'PENDING';
     const isNone = !currentStatus || currentStatus === 'NONE' || currentStatus === 'null' || currentStatus === '';
-    // 🔥 CORRECTION : Gérer correctement l'état EXPIRED
     const isExpiredStatus = currentStatus === 'EXPIRED';
     const showExpired = (isActive && isExpired) || isExpiredStatus;
 
-    // États personnalisés avec animations
     const statusConfig = {
         ACTIVE: {
             icon: <VerifiedUser sx={{ fontSize: 40 }} />,
@@ -167,7 +187,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                         border: `1px solid ${currentStatusConfig.color}30`
                     }}
                 >
-                    {/* Header avec animation */}
                     <Box sx={{ 
                         p: { xs: 3, sm: 4 },
                         background: `linear-gradient(135deg, ${currentStatusConfig.color} 0%, ${currentStatusConfig.color}CC 100%)`,
@@ -208,9 +227,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                         </Stack>
                     </Box>
 
-                    {/* Contenu principal */}
                     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-                        {/* État PENDING */}
                         {isPending && (
                             <Fade in={true}>
                                 <Box>
@@ -277,7 +294,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                             </Fade>
                         )}
 
-                        {/* 🔥 État EXPIRÉ - AVEC BOUTON DE RENOUVELLEMENT */}
                         {showExpired && (
                             <Fade in={true}>
                                 <Box>
@@ -312,7 +328,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                                         </Stack>
                                     </Card>
 
-                                    {/* 🔥 BOUTON DE RENOUVELLEMENT POUR EXPIRÉ */}
                                     <Button 
                                         variant="contained" 
                                         onClick={handleRenew} 
@@ -333,7 +348,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                             </Fade>
                         )}
 
-                        {/* État ACTIF (non expiré) */}
                         {isActive && !isExpired && !isExpiredStatus && (
                             <Fade in={true}>
                                 <Box>
@@ -350,7 +364,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                                             Certificat valide et opérationnel
                                         </Typography>
                                         <Typography variant="body2">
-                                            Votre identité numérique est certifiée et sécurisée.
+                                            Votre identity numérique est certifiée et sécurisée.
                                         </Typography>
                                     </Alert>
 
@@ -471,7 +485,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                             </Fade>
                         )}
 
-                        {/* État NONE */}
                         {isNone && (
                             <Fade in={true}>
                                 <Box>
@@ -525,7 +538,6 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
                 </MotionPaper>
             </AnimatePresence>
 
-            {/* Footer */}
             <Box sx={{ mt: 3, textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#94a3b8' }}>
                     🛡️ Infrastructure PKI sécurisée - Conformité eIDAS & ISO 27005
