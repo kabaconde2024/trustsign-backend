@@ -68,15 +68,36 @@ const UserDashboard = () => {
 
 const fetchUserProfile = async () => {
     try {
+        const token = localStorage.getItem('accessToken');
+        console.log('[fetchUserProfile] Token présent:', !!token);
+        
         const response = await API.get('/api/utilisateur/mon-profil');
+        console.log('[fetchUserProfile] Succès:', response.data);
         setUserData(response.data);
     } catch (error) { 
-        console.error("Erreur profil:", error); 
-        if (error.response?.status === 403 || error.response?.status === 401) {
-            // 🔴 ICI ! C'est ce qui efface le token
-            localStorage.clear();
-            window.location.href = '/';
+        console.error("[fetchUserProfile] Erreur:", error.response?.status, error.response?.data);
+        
+        // ⚠️ NE PAS EFFACER LE TOKEN ICI
+        // Au lieu de ça, afficher une erreur silencieuse
+        
+        // Si c'est vraiment une erreur 401 (token invalide)
+        if (error.response?.status === 401) {
+            console.warn("Token invalide, tentative de rafraîchissement...");
+            // Option: essayer de rafraîchir le token ici
+            // Ou rediriger après un délai
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 3000);
         }
+        
+        // Mettre à jour l'interface utilisateur sans déconnexion brutale
+        setUserData({ 
+            email: '', 
+            telephone: '', 
+            prenom: 'Utilisateur', 
+            nom: '', 
+            statut: 'UNKNOWN' 
+        });
     }
 };
 
