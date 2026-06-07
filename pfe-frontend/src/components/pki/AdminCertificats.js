@@ -1,469 +1,304 @@
-import React, { useEffect, useState, useCallback } from 'react';
+// components/superadmin/AdminCertificats.js - Version Alignée (Cookies & Token)
+import React, { useState, useEffect } from 'react';
 import { 
-    Box, Typography, Table, TableBody, TableCell, TableHead, TableRow, 
-    TableContainer, Paper, Button, Chip, Stack, CircularProgress, 
-    IconButton, Tooltip, Alert, Card, CardContent, Grid, 
-    Dialog, DialogTitle, DialogContent, DialogActions, Divider, Snackbar,
-    useMediaQuery
+    Box, Grid, Card, CardContent, Typography, Stack, 
+    Avatar, LinearProgress, Paper, Table, TableBody, 
+    TableCell, TableContainer, TableHead, TableRow, Chip,
+    Tooltip, useMediaQuery, Button, Dialog, DialogTitle, 
+    DialogContent, IconButton as MuiIconButton
 } from '@mui/material';
-
 import { 
-    VerifiedUser, 
-    HourglassEmpty, 
-    Refresh as RefreshIcon,
-    CheckCircleOutline,
-    Block as BlockIcon,
-    Security as SecurityIcon,
-    Dns as DnsIcon,
-    Visibility as VisibilityIcon,
-    Close as CloseIcon,
-    ContentCopy as CopyIcon,
-    Person as PersonIcon,
-    Email as EmailIcon,
-    Phone as PhoneIcon,
-    Badge as BadgeIcon,
-    DeleteSweep as DeleteSweepIcon
+    VerifiedUser, Pending, Shield, FactCheck, 
+    Cancel, Close as CloseIcon
 } from '@mui/icons-material';
+import API from '../../services/api';  // ← Transmet automatiquement les cookies/tokens
 
-// URL de l'API backend
-const API_BASE_URL = 'https://backendmemoire.onrender.com';
-
-// Fonction pour les requêtes API avec cookie
-const fetchAPI = async (endpoint, options = {}) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            ...options.headers
-        }
+const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) => {
+    const [certStats, setCertStats] = useState({
+        totalCertificates: 0,
+        activeCertificates: 0,
+        pendingCertificates: 0,
+        revokedCertificates: 0
     });
-    
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-    return response.json();
-};
-
-const AdminCertificats = () => {
-    const [demandes, setDemandes] = useState([]);
-    const [certificatsActifs, setCertificatsActifs] = useState([]);
+    const [certificatesList, setCertificatesList] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({ pending: 0, active: 0 });
-    const [message, setMessage] = useState({ text: '', type: 'info' });
-    const [openModal, setOpenModal] = useState(false);
-    const [selectedCert, setSelectedCert] = useState(null);
-    const [openPreviewModal, setOpenPreviewModal] = useState(false);
-    const [selectedDemande, setSelectedDemande] = useState(null);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    
-    // Responsive detection
-    const isMobile = useMediaQuery('(max-width:600px)');
-    const isTablet = useMediaQuery('(max-width:960px)');
-    const isSmallMobile = useMediaQuery('(max-width:380px)');
+    const [openActionDialog, setOpenActionDialog] = useState(false);
+    const [certificatSelectionne, setCertificatSelectionne] = useState(null);
+    const [actionType, setActionType] = useState(''); // 'approve' ou 'revoke'
 
-    const fetchData = useCallback(async () => {
+    const isSmallScreen = useMediaQuery('(max-width:600px)');
+    const mobile = isMobile || isSmallScreen;
+
+    // Même abstraction que StatsView : l'instance API porte les cookies/tokens de session
+    const fetchAPI = async (endpoint) => {
+        try {
+            const response = await API.get(endpoint);
+            return response.data;
+        } catch (error) {
+            console.error(`Erreur fetch ${endpoint}:`, error);
+            throw error;
+        }
+    };
+
+    const loadData = async () => {
         setLoading(true);
         try {
-            const [demandesData, actifsData, statsData] = await Promise.all([
-                fetchAPI('/api/admin/pki/demandes-en-attente'),
-                fetchAPI('/api/admin/pki/certificats-actifs'),
-                fetchAPI('/api/admin/pki/stats')
+            // Les cookies de session/tokens sont joints automatiquement ici
+            const [statsRes, listRes] = await Promise.all([
+                fetchAPI('/admin/pki/stats'),
+                fetchAPI('/admin/pki/certificats')
             ]);
-            setDemandes(demandesData);
-            setCertificatsActifs(actifsData);
-            setStats(statsData);
+
+            setCertStats({
+                totalCertificates: statsRes.total || 0,
+                activeCertificates: statsRes.active || 0,
+                pendingCertificates: statsRes.pending || 0,
+                revokedCertificates: statsRes.revoked || 0
+            });
+            setCertificatesList(listRes || []);
         } catch (error) {
-            console.error("Erreur PKI:", error);
-            setMessage({ text: "Erreur lors du chargement des services PKI", type: 'error' });
+            console.error("Erreur chargement données PKI:", error);
+            if (setSnackbar) {
+                setSnackbar({ open: true, message: "Erreur d'authentification ou de chargement", severity: 'error' });
+            }
         } finally {
             setLoading(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        loadData();
+    }, [setSnackbar]);
 
-    const ouvrirVisualisationDemande = (demande) => {
-        setSelectedDemande(demande);
-        setOpenPreviewModal(true);
+    const handleOpenAction = (certificat, type) => {
+        setCertificatSelectionne(certificat);
+        setActionType(type);
+        setOpenActionDialog(true);
     };
 
-    const handleApprove = async (userId) => {
+    const handleProcessAction = async (id, statusAction) => {
         try {
-            setMessage({ text: "Initialisation du SoftHSM et signature cryptographique...", type: 'info' });
-            const data = await fetchAPI(`/api/admin/pki/approve/${userId}`, { method: 'POST' });
-            setMessage({ text: data.message || "Certificat généré avec succès !", type: 'success' });
-            setOpenPreviewModal(false);
-            fetchData();
+            // Appel PUT utilisant la même instance API sécurisée par cookie/token
+            await API.put(`/admin/pki/certificats/${id}`, { status: statusAction });
+            
+            if (setSnackbar) {
+                setSnackbar({ 
+                    open: true, 
+                    message: `Action '${statusAction}' exécutée avec succès`, 
+                    severity: 'success' 
+                });
+            }
+            setOpenActionDialog(false);
+            loadData(); // Rafraîchissement automatique du registre
         } catch (error) {
-            const errorMsg = error.message || "Échec de l'opération cryptographique";
-            setMessage({ text: errorMsg, type: 'error' });
+            console.error("Erreur lors de la modification du statut:", error);
+            if (setSnackbar) {
+                setSnackbar({ open: true, message: "Action non autorisée ou erreur serveur", severity: 'error' });
+            }
         }
     };
 
-    const ouvrirVisualisation = (cert) => {
-        setSelectedCert(cert);
-        setOpenModal(true);
-    };
+    const statCards = [
+        { title: "Total Certificats", value: certStats.totalCertificates, icon: <Shield />, color: "#1a237e", bg: "#e8eaf6" },
+        { title: "Certificats Actifs", value: certStats.activeCertificates, icon: <VerifiedUser />, color: "#2e7d32", bg: "#e8f5e9" },
+        { title: "En Attente", value: certStats.pendingCertificates, icon: <Pending />, color: "#ed6c02", bg: "#fff4e5" },
+        { title: "Révoqués", value: certStats.revokedCertificates, icon: <Cancel />, color: "#d32f2f", bg: "#ffebee" }
+    ];
 
-    const copierPem = () => {
-        if (selectedCert?.certificatPem) {
-            navigator.clipboard.writeText(selectedCert.certificatPem);
-            setSnackbar({ open: true, message: "PEM copié dans le presse-papier", severity: 'success' });
+    const getStatusChip = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'active': case 'actif':
+                return <Chip icon={<VerifiedUser />} label="Actif" size="small" color="success" variant="outlined" />;
+            case 'pending': case 'en attente':
+                return <Chip icon={<Pending />} label="En attente" size="small" color="warning" variant="outlined" />;
+            case 'revoked': case 'révoqué':
+                return <Chip icon={<Cancel />} label="Révoqué" size="small" color="error" variant="outlined" />;
+            default:
+                return <Chip label={status || "Inconnu"} size="small" variant="outlined" />;
         }
     };
 
-    const nettoyerCertificatsExpires = async () => {
-        try {
-            const data = await fetchAPI('/api/admin/pki/nettoyer-certificats-expires');
-            setSnackbar({ open: true, message: data.message, severity: 'success' });
-            fetchData();
-        } catch (error) {
-            setSnackbar({ open: true, message: "Erreur lors du nettoyage", severity: 'error' });
-        }
-    };
-
-    const isCertificatExpire = (cert) => {
-        if (!cert.dateExpiration) return false;
-        try {
-            const expirationDate = new Date(cert.dateExpiration);
-            const now = new Date();
-            return expirationDate < now;
-        } catch (e) {
-            return false;
-        }
-    };
-
-    const envoyerConfirmation = async (userId) => {
-    try {
-        setLoading(true);
-        const response = await fetchAPI(`/api/admin/pki/demander-confirmation/${userId}`, { 
-            method: 'POST' 
-        });
-        setSnackbar({ 
-            open: true, 
-            message: response.message || "Email de confirmation envoyé", 
-            severity: 'success' 
-        });
-        fetchData(); // Rafraîchir la liste
-    } catch (error) {
-        setSnackbar({ 
-            open: true, 
-            message: error.message || "Erreur lors de l'envoi", 
-            severity: 'error' 
-        });
-    } finally {
-        setLoading(false);
-    }
-};
+    if (loading) return <LinearProgress />;
 
     return (
-        <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
-            {/* Header */}
-            <Stack direction={isMobile ? "column" : "row"} justifyContent="space-between" alignItems={isMobile ? "stretch" : "center"} mb={isMobile ? 2 : 4} spacing={isMobile ? 2 : 0}>
-                <Box>
-                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ color: '#1a237e', fontSize: isSmallMobile ? '1.25rem' : 'inherit' }}>
-                        Autorité de Certification (CA) Dashboard
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
-                        Gestion du cycle de vie des identités numériques (SoftHSMv2 + X.509)
-                    </Typography>
-                </Box>
-                <Stack direction={isMobile ? "column" : "row"} spacing={isMobile ? 1 : 2}>
-                    <Button 
-                        variant="outlined" 
-                        color="warning"
-                        startIcon={<DeleteSweepIcon />} 
-                        onClick={nettoyerCertificatsExpires}
-                        fullWidth={isMobile}
-                        size={isMobile ? "small" : "medium"}
-                        sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
-                    >
-                        Nettoyer expirés
-                    </Button>
-                    <Button 
-                        variant="contained" 
-                        startIcon={<RefreshIcon />} 
-                        onClick={fetchData}
-                        sx={{ borderRadius: 2, bgcolor: '#1a237e' }}
-                        fullWidth={isMobile}
-                        size={isMobile ? "small" : "medium"}
-                    >
-                        Actualiser
-                    </Button>
-                </Stack>
-            </Stack>
-
-            {message.text && (
-                <Alert severity={message.type} sx={{ mb: 3, borderRadius: 2 }} onClose={() => setMessage({ text: '', type: 'info' })}>
-                    {message.text}
-                </Alert>
-            )}
-
-            {/* Statistiques */}
-            <Grid container spacing={isMobile ? 2 : 3} mb={isMobile ? 3 : 5}>
-                <Grid item xs={12} sm={6}>
-                    <Card sx={{ borderLeft: '6px solid #ffa000', boxShadow: 3 }}>
-                        <CardContent sx={{ display: 'flex', alignItems: 'center', p: isMobile ? 1.5 : 2 }}>
-                            <HourglassEmpty sx={{ fontSize: isMobile ? 30 : 40, color: '#ffa000', mr: 2 }} />
-                            <Box>
-                                <Typography color="textSecondary" variant="overline" sx={{ fontSize: isMobile ? '0.6rem' : '0.75rem' }}>
-                                    Demandes CSR en attente
-                                </Typography>
-                                <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold">{stats.pending}</Typography>
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                    <Card sx={{ borderLeft: '6px solid #2e7d32', boxShadow: 3 }}>
-                        <CardContent sx={{ display: 'flex', alignItems: 'center', p: isMobile ? 1.5 : 2 }}>
-                            <VerifiedUser sx={{ fontSize: isMobile ? 30 : 40, color: '#2e7d32', mr: 2 }} />
-                            <Box>
-                                <Typography color="textSecondary" variant="overline" sx={{ fontSize: isMobile ? '0.6rem' : '0.75rem' }}>
-                                    Certificats Actifs
-                                </Typography>
-                                <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold">{stats.active}</Typography>
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            {/* SECTION 1 : DEMANDES EN ATTENTE */}
-            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', mb: 2 }}>
-                <SecurityIcon sx={{ mr: 1 }} /> File d'attente de signature (RA/CA)
+        <Box sx={{ px: { xs: 0, sm: 1 } }}>
+            <Typography variant={mobile ? "h6" : "h5"} fontWeight="800" sx={{ mb: mobile ? 2 : 4, color: '#1a237e' }}>
+                Gestion de la PKI & Certificats
             </Typography>
             
-            {isMobile ? (
-                // Version mobile - cartes
-                <Stack spacing={2} sx={{ mb: 5 }}>
-                    {loading ? <Box textAlign="center"><CircularProgress /></Box> :
-                     demandes.length === 0 ? <Paper sx={{ p: 3, textAlign: 'center' }}>Aucune demande en attente</Paper> :
-                     demandes.map((row) => (
-                        <Card key={row.id} sx={{ borderRadius: 2 }}>
-                            <CardContent>
-                                <Stack spacing={1.5}>
-                                    <Typography variant="body1" fontWeight="bold">{row.prenom} {row.nom}</Typography>
-                                    <Typography variant="caption" color="textSecondary">{row.email}</Typography>
-                                    <Typography variant="caption">Demande: {row.dateDemande ? new Date(row.dateDemande).toLocaleString() : 'N/A'}</Typography>
-                                    <Stack direction="row" spacing={1}>
-                                        <Button variant="outlined" size="small" startIcon={<VisibilityIcon />} onClick={() => ouvrirVisualisationDemande(row)} fullWidth>Visualiser</Button>
-                                        <Button variant="contained" color="success" size="small" startIcon={<CheckCircleOutline />} onClick={() => handleApprove(row.id)} fullWidth>Approuver</Button>
-                                    </Stack>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, color: '#64748b', fontSize: mobile ? '0.8rem' : '0.9rem' }}>
+                Vue d'ensemble
+            </Typography>
+            <Grid container spacing={mobile ? 2 : 3} sx={{ mb: mobile ? 3 : 5 }}>
+                {statCards.map((card, idx) => (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key={idx}>
+                        <Card sx={{ borderRadius: '16px', boxShadow: '0px 2px 8px rgba(0,0,0,0.05)' }}>
+                            <CardContent sx={{ p: mobile ? 1.5 : 2 }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                    <Box>
+                                        <Typography variant="caption" color="textSecondary" sx={{ fontSize: mobile ? '0.65rem' : '0.75rem' }}>
+                                            {card.title}
+                                        </Typography>
+                                        <Typography variant={mobile ? "h5" : "h4"} fontWeight="bold" sx={{ color: card.color }}>
+                                            {card.value}
+                                        </Typography>
+                                    </Box>
+                                    <Avatar sx={{ bgcolor: card.bg, color: card.color, width: mobile ? 40 : 48, height: mobile ? 40 : 48 }}>
+                                        {card.icon}
+                                    </Avatar>
                                 </Stack>
                             </CardContent>
                         </Card>
-                     ))}
+                    </Grid>
+                ))}
+            </Grid>
+
+            <Typography variant={mobile ? "subtitle1" : "h6"} fontWeight="bold" sx={{ mb: 2, color: '#1a237e' }}>
+                Registre des Certificats
+            </Typography>
+            
+            {mobile ? (
+                /* Layout Cartes pour Mobile */
+                <Stack spacing={2}>
+                    {certificatesList.length === 0 ? (
+                        <Paper sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body2" color="textSecondary">Aucun certificat trouvé</Typography>
+                        </Paper>
+                    ) : (
+                        certificatesList.map((cert, idx) => (
+                            <Paper key={idx} sx={{ p: 2, borderRadius: '12px' }}>
+                                <Stack spacing={1}>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                        {getStatusChip(cert.status)}
+                                        <Typography variant="caption" color="textSecondary">
+                                            {new Date(cert.dateCreation || cert.date).toLocaleDateString()}
+                                        </Typography>
+                                    </Stack>
+                                    <Typography variant="body2" fontWeight="bold">{cert.commonName || cert.user}</Typography>
+                                    <Typography variant="caption" color="textSecondary">Email : {cert.email || 'N/A'}</Typography>
+                                    
+                                    {cert.status?.toLowerCase() === 'pending' && (
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            color="success"
+                                            onClick={() => handleOpenAction(cert, 'approve')}
+                                            sx={{ mt: 1, borderRadius: 2, textTransform: 'none' }}
+                                        >
+                                            Valider la demande
+                                        </Button>
+                                    )}
+                                    {(cert.status?.toLowerCase() === 'active' || cert.status?.toLowerCase() === 'actif') && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={() => handleOpenAction(cert, 'revoke')}
+                                            sx={{ mt: 1, borderRadius: 2, textTransform: 'none' }}
+                                        >
+                                            Révoquer
+                                        </Button>
+                                    )}
+                                </Stack>
+                            </Paper>
+                        ))
+                    )}
                 </Stack>
             ) : (
-                <TableContainer component={Paper} sx={{ borderRadius: 2, mb: 5, overflowX: 'auto' }}>
-                    <Table sx={{ minWidth: 600 }}>
+                /* Layout Tableau pour Desktop/Tablette */
+                <TableContainer component={Paper} sx={{ borderRadius: '12px', overflowX: 'auto' }}>
+                    <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                             <TableRow>
-                                <TableCell><b>Utilisateur</b></TableCell>
-                                <TableCell><b>Email</b></TableCell>
-                                <TableCell><b>Date demande</b></TableCell>
-                                <TableCell>Statut confirmation</TableCell>  
-
-                                <TableCell align="center"><b>Actions</b></TableCell>
+                                <TableCell><b>Statut</b></TableCell>
+                                <TableCell><b>Utilisateur (CN)</b></TableCell>
+                                <TableCell><b>Adresse Email</b></TableCell>
+                                <TableCell><b>Date d'émission</b></TableCell>
+                                <TableCell align="right"><b>Actions</b></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {loading ? <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow> :
-                             demandes.length === 0 ? <TableRow><TableCell colSpan={4} align="center">Aucune demande en attente</TableCell></TableRow> :
-                             demandes.map((row) => (
-                              // Dans le tableau des demandes
-<TableRow key={row.id} hover>
-    <TableCell>{row.prenom} {row.nom}</TableCell>
-    <TableCell>{row.email}</TableCell>
-    <TableCell>{row.dateDemande ? new Date(row.dateDemande).toLocaleString() : 'N/A'}</TableCell>
-    <TableCell>
-        {/* 🆕 AFFICHER LE STATUT DE CONFIRMATION */}
-        {row.confirme ? (
-            <Chip label="✅ Confirmé" color="success" size="small" />
-        ) : row.demandeStatut === 'AWAITING_CONFIRMATION' ? (
-            <Chip label="⏳ En attente confirmation" color="warning" size="small" />
-        ) : (
-            <Chip label="❌ Non confirmé" color="error" size="small" />
-        )}
-    </TableCell>
-    <TableCell align="center">
-        <Stack direction="row" spacing={1} justifyContent="center">
-            <Button size="small" startIcon={<VisibilityIcon />} onClick={() => ouvrirVisualisationDemande(row)}>
-                Visualiser
-            </Button>
-            {/* 🆕 BOUTON ENVOYER CONFIRMATION */}
-            {!row.confirme && row.demandeStatut !== 'AWAITING_CONFIRMATION' && (
-                <Button 
-                    size="small" 
-                    color="warning" 
-                    startIcon={<EmailIcon />} 
-                    onClick={() => envoyerConfirmation(row.id)}
-                >
-                    Envoyer confirmation
-                </Button>
-            )}
-            {/* 🆕 BOUTON APPROUVER (désactivé si non confirmé) */}
-            <Button 
-                variant="contained" 
-                color="success" 
-                size="small" 
-                startIcon={<CheckCircleOutline />} 
-                onClick={() => handleApprove(row.id)}
-                disabled={!row.confirme}  // ← DÉSACTIVÉ SI NON CONFIRMÉ
-            >
-                Approuver
-            </Button>
-        </Stack>
-    </TableCell>
-</TableRow>
-                            ))}
+                            {certificatesList.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} align="center">Aucun certificat dans le registre</TableCell></TableRow>
+                            ) : (
+                                certificatesList.map((cert, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{getStatusChip(cert.status)}</TableCell>
+                                        <TableCell>{cert.commonName || cert.user}</TableCell>
+                                        <TableCell>{cert.email || 'N/A'}</TableCell>
+                                        <TableCell>{new Date(cert.dateCreation || cert.date).toLocaleDateString()}</TableCell>
+                                        <TableCell align="right">
+                                            {cert.status?.toLowerCase() === 'pending' && (
+                                                <Button 
+                                                    size="small" 
+                                                    variant="contained" 
+                                                    color="success" 
+                                                    onClick={() => handleOpenAction(cert, 'approve')}
+                                                    sx={{ borderRadius: '8px', textTransform: 'none' }}
+                                                >
+                                                    Approuver
+                                                </Button>
+                                            )}
+                                            {(cert.status?.toLowerCase() === 'active' || cert.status?.toLowerCase() === 'actif') && (
+                                                <Button 
+                                                    size="small" 
+                                                    variant="outlined" 
+                                                    color="error" 
+                                                    onClick={() => handleOpenAction(cert, 'revoke')}
+                                                    sx={{ borderRadius: '8px', textTransform: 'none' }}
+                                                >
+                                                    Révoquer
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </TableContainer>
             )}
 
-            {/* MODALE DE VISUALISATION DE LA DEMANDE */}
-            <Dialog open={openPreviewModal} onClose={() => setOpenPreviewModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { margin: isMobile ? 1 : 2, width: isMobile ? 'calc(100% - 32px)' : 'auto' } }}>
-                <DialogTitle sx={{ bgcolor: '#1a237e', color: 'white', py: isMobile ? 1.5 : 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant={isMobile ? "subtitle1" : "h6"}>📋 Détails de la demande de certificat</Typography>
-                        <IconButton onClick={() => setOpenPreviewModal(false)} sx={{ color: 'white' }}><CloseIcon /></IconButton>
-                    </Stack>
+            {/* Boîte de Dialogue pour les Actions (Validation / Révocation) */}
+            <Dialog 
+                open={openActionDialog} 
+                onClose={() => setOpenActionDialog(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: '16px', margin: mobile ? '16px' : '32px' } }}
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e0e0e0', pb: 1 }}>
+                    <Typography variant="h6" fontWeight="bold">
+                        {actionType === 'approve' ? "Approbation du certificat" : "Révocation du certificat"}
+                    </Typography>
+                    <MuiIconButton onClick={() => setOpenActionDialog(false)} size="small">
+                        <CloseIcon />
+                    </MuiIconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ p: isMobile ? 2 : 3 }}>
-                    {selectedDemande && (
-                        <Stack spacing={isMobile ? 2 : 3}>
-                            <Card variant="outlined" sx={{ p: isMobile ? 1.5 : 2 }}>
-                                <Typography variant="subtitle2" color="primary" gutterBottom><PersonIcon sx={{ fontSize: 16, mr: 0.5 }} /> Informations personnelles</Typography>
-                                <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 1 }}>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Nom complet</Typography><Typography variant="body2" fontWeight="bold">{selectedDemande.prenom} {selectedDemande.nom}</Typography></Grid>
-                                    <Grid item xs={6}><Typography variant="caption" color="textSecondary">Rôle</Typography><Chip label={selectedDemande.role} size="small" sx={{ mt: 0.5 }} /></Grid>
-                                    <Grid item xs={12}><Typography variant="caption" color="textSecondary">Email</Typography><Typography variant="body2"><EmailIcon sx={{ fontSize: 14, mr: 0.5 }} /> {selectedDemande.email}</Typography></Grid>
-                                    <Grid item xs={12}><Typography variant="caption" color="textSecondary">Téléphone</Typography><Typography variant="body2"><PhoneIcon sx={{ fontSize: 14, mr: 0.5 }} /> {selectedDemande.telephone || 'Non renseigné'}</Typography></Grid>
-                                </Grid>
-                            </Card>
-                            <Card variant="outlined" sx={{ p: isMobile ? 1.5 : 2 }}>
-                                <Typography variant="subtitle2" color="primary" gutterBottom><BadgeIcon sx={{ fontSize: 16, mr: 0.5 }} /> Informations de certification</Typography>
-                                <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}><Typography variant="caption" color="textSecondary">Alias HSM</Typography><Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '12px' }}>{selectedDemande.hsmAlias || 'À générer'}</Typography></Grid>
-                                    <Grid item xs={12}><Typography variant="caption" color="textSecondary">Statut actuel</Typography><Chip label={selectedDemande.statusPki === 'PENDING' ? 'Demande en attente' : selectedDemande.statusPki} color={selectedDemande.statusPki === 'PENDING' ? 'warning' : 'default'} size="small" /></Grid>
-                                </Grid>
-                            </Card>
-                            <Alert severity="info" sx={{ borderRadius: 2 }}>
-                                <Typography variant="body2">⚠️ En approuvant cette demande, vous allez :</Typography>
-                                <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                                    <li>Générer une paire de clés RSA 2048 bits dans le HSM</li>
-                                    <li>Créer un certificat X.509 signé par l'autorité de certification</li>
-                                    <li>Lier le certificat à l'utilisateur {selectedDemande.prenom} {selectedDemande.nom}</li>
-                                </ul>
-                            </Alert>
+                <DialogContent sx={{ pt: 3 }}>
+                    {certificatSelectionne && (
+                        <Stack spacing={3} sx={{ mt: 1 }}>
+                            <Typography variant="body1">
+                                Êtes-vous sûr de vouloir {actionType === 'approve' ? "générer et approuver" : "révoquer définitivement"} le certificat pour : 
+                                <br /><strong>{certificatSelectionne.commonName || certificatSelectionne.user}</strong> ({certificatSelectionne.email}) ?
+                            </Typography>
+                            <Stack direction="row" spacing={2} justifyContent="flex-end">
+                                <Button variant="text" color="inherit" onClick={() => setOpenActionDialog(false)} sx={{ textTransform: 'none' }}>
+                                    Annuler
+                                </Button>
+                                <Button 
+                                    variant="contained" 
+                                    color={actionType === 'approve' ? "success" : "error"}
+                                    onClick={() => handleProcessAction(certificatSelectionne.id, actionType === 'approve' ? 'active' : 'revoked')}
+                                    sx={{ borderRadius: '8px', textTransform: 'none' }}
+                                >
+                                    Confirmer
+                                </Button>
+                            </Stack>
                         </Stack>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: isMobile ? 2 : 2, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1 : 0 }}>
-                    <Button variant="outlined" onClick={() => setOpenPreviewModal(false)} fullWidth={isMobile}>Refuser</Button>
-                    <Button variant="contained" color="success" startIcon={<CheckCircleOutline />} onClick={() => handleApprove(selectedDemande?.id)} fullWidth={isMobile}>Approuver & Générer</Button>
-                </DialogActions>
             </Dialog>
-
-            {/* SECTION 2 : RÉPERTOIRE DES CERTIFICATS */}
-            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', mt: isMobile ? 3 : 0, mb: 2 }}>
-                <DnsIcon sx={{ mr: 1 }} /> Répertoire des Certificats
-            </Typography>
-            
-            {isMobile ? (
-                <Stack spacing={2}>
-                    {loading ? <Box textAlign="center"><CircularProgress /></Box> :
-                     certificatsActifs.length === 0 ? <Paper sx={{ p: 3, textAlign: 'center' }}>Aucun certificat émis</Paper> :
-                     certificatsActifs.map((cert) => {
-                        const estExpire = isCertificatExpire(cert);
-                        return (
-                            <Card key={cert.id} sx={{ bgcolor: estExpire ? '#fff3cd' : 'inherit', borderRadius: 2 }}>
-                                <CardContent>
-                                    <Stack spacing={1.5}>
-                                        <Typography variant="body1" fontWeight="bold">{cert.nomComplet}</Typography>
-                                        <Typography variant="caption" color="textSecondary">{cert.email}</Typography>
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <Chip label={estExpire ? "EXPIRÉ" : "ACTIF"} color={estExpire ? "error" : "success"} size="small" />
-                                            <Typography variant="caption" color={estExpire ? "error" : "textSecondary"}>
-                                                Expire: {cert.dateExpiration ? new Date(cert.dateExpiration).toLocaleDateString() : 'N/A'}
-                                            </Typography>
-                                        </Stack>
-                                        <Button startIcon={<VisibilityIcon />} variant="outlined" size="small" onClick={() => ouvrirVisualisation(cert)} fullWidth>Visualiser X.509</Button>
-                                    </Stack>
-                                </CardContent>
-                            </Card>
-                        );
-                     })}
-                </Stack>
-            ) : (
-                <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: 'auto' }}>
-                    <Table sx={{ minWidth: 700 }}>
-                        <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                            <TableRow>
-                                <TableCell><b>Détenteur</b></TableCell>
-                                <TableCell><b>Email</b></TableCell>
-                                <TableCell><b>Statut</b></TableCell>
-                                <TableCell><b>Date expiration</b></TableCell>
-                                <TableCell align="center"><b>Audit Certificat</b></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loading ? <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow> :
-                             certificatsActifs.length === 0 ? <TableRow><TableCell colSpan={5} align="center">Aucun certificat émis</TableCell></TableRow> :
-                             certificatsActifs.map((cert) => {
-                                const estExpire = isCertificatExpire(cert);
-                                return (
-                                    <TableRow key={cert.id} hover sx={{ bgcolor: estExpire ? '#fff3cd' : 'inherit' }}>
-                                        <TableCell>{cert.nomComplet}</TableCell>
-                                        <TableCell>{cert.email}</TableCell>
-                                        <TableCell><Chip label={estExpire ? "EXPIRÉ" : "ACTIF"} color={estExpire ? "error" : "success"} size="small" variant="outlined" /></TableCell>
-                                        <TableCell><Typography variant="body2" color={estExpire ? "error" : "textSecondary"}>{cert.dateExpiration ? new Date(cert.dateExpiration).toLocaleDateString() : 'N/A'}</Typography></TableCell>
-                                        <TableCell align="center"><Button startIcon={<VisibilityIcon />} variant="outlined" size="small" onClick={() => ouvrirVisualisation(cert)}>Visualiser X.509</Button></TableCell>
-                                    </TableRow>
-                                );
-                             })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
-
-            {/* MODALE DE VISUALISATION X.509 */}
-            <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="md" fullWidth PaperProps={{ sx: { margin: isMobile ? 1 : 2, width: isMobile ? 'calc(100% - 32px)' : 'auto' } }}>
-                <DialogTitle sx={{ bgcolor: '#1a237e', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: isMobile ? 1.5 : 2 }}>
-                    <Typography variant={isMobile ? "subtitle1" : "h6"}>Certificat Numérique - {selectedCert?.nomComplet}</Typography>
-                    <IconButton onClick={() => setOpenModal(false)} sx={{ color: 'white' }}><CloseIcon /></IconButton>
-                </DialogTitle>
-                <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
-                    <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: 1 }}>
-                        <Grid item xs={6}><Typography variant="caption" color="textSecondary">Numéro de Série</Typography><Typography variant="body2" fontWeight="bold" sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem' }}>{selectedCert?.numeroSerie}</Typography></Grid>
-                        <Grid item xs={6}><Typography variant="caption" color="textSecondary">Algorithme</Typography><Typography variant="body2" fontWeight="bold">{selectedCert?.algorithme}</Typography></Grid>
-                        <Grid item xs={6}><Typography variant="caption" color="textSecondary">Valide du</Typography><Typography variant="body2">{selectedCert?.dateEmission ? new Date(selectedCert.dateEmission).toLocaleDateString() : 'N/A'}</Typography></Grid>
-                        <Grid item xs={6}><Typography variant="caption" color="textSecondary">Expire le</Typography><Typography variant="body2" color="error">{selectedCert?.dateExpiration ? new Date(selectedCert.dateExpiration).toLocaleDateString() : 'N/A'}</Typography></Grid>
-                    </Grid>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="caption" color="primary">Clé Publique (Base64)</Typography>
-                    <Box sx={{ bgcolor: '#f0f0f0', p: 1, borderRadius: 1, fontSize: isMobile ? '0.6rem' : '0.7rem', wordBreak: 'break-all', fontFamily: 'monospace', maxHeight: isMobile ? 100 : 'auto', overflow: 'auto' }}>{selectedCert?.clePublique}</Box>
-                    <Typography variant="caption" color="primary" sx={{ mt: 2, display: 'block' }}>Bloc PEM Complet</Typography>
-                    <Box sx={{ bgcolor: '#1e1e1e', color: '#4caf50', p: isMobile ? 1.5 : 2, mt: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: isMobile ? '0.6rem' : '0.75rem', maxHeight: isMobile ? 200 : 300, overflow: 'auto' }}>
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{selectedCert?.certificatPem}</pre>
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ p: isMobile ? 2 : 2 }}>
-                    <Button startIcon={<CopyIcon />} onClick={copierPem} size={isMobile ? "small" : "medium"}>Copier PEM</Button>
-                    <Button onClick={() => setOpenModal(false)} variant="contained" size={isMobile ? "small" : "medium"}>Fermer</Button>
-                </DialogActions>
-            </Dialog>
-
-            <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: isMobile ? 'center' : 'left' }}>
-                <Alert severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
-            </Snackbar>
         </Box>
     );
 };
