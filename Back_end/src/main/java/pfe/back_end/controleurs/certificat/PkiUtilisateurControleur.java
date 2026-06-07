@@ -18,21 +18,16 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/utilisateur/pki")
 @CrossOrigin(origins = {
-    "https://localhost:3000",
-    "http://localhost:3000"
-    //"https://trustsign-frontend.onrender.com"
+    "http://localhost:3000",
+    "https://frontendmemoire.onrender.com"
 }, allowCredentials = "true")
-
-
 public class PkiUtilisateurControleur {
 
     @Autowired
     private UtilisateurRepository utilisateurRepository;
 
-
     @Autowired
     private ServiceAudit serviceAudit;
-
 
     @PostMapping("/request-certificate")
     public ResponseEntity<?> requestCertificate(Authentication auth) {
@@ -75,8 +70,6 @@ public class PkiUtilisateurControleur {
         }
     }
 
-
-
     @GetMapping("/mon-statut")
     public ResponseEntity<?> getMonStatut(Authentication auth) {
         try {
@@ -93,7 +86,6 @@ public class PkiUtilisateurControleur {
             response.put("status", status);
             response.put("certificatPem", user.getCertificatPem());
             response.put("hsmAlias", user.getHsmAlias());
-
 
             if (user.getCertificatPem() != null && !user.getCertificatPem().isEmpty()) {
                 try {
@@ -122,6 +114,7 @@ public class PkiUtilisateurControleur {
             return ResponseEntity.status(500).body(Map.of("erreur", e.getMessage()));
         }
     }
+
     @PostMapping("/renouveler-certificat")
     public ResponseEntity<?> renouvelerCertificat(Authentication auth) {
         try {
@@ -149,12 +142,10 @@ public class PkiUtilisateurControleur {
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certBytes));
                     cert.checkValidity();
 
-                    // Certificat encore valide
                     return ResponseEntity.badRequest().body(Map.of(
                             "message", "Votre certificat est encore valide jusqu'au " + cert.getNotAfter()
                     ));
                 } catch (CertificateExpiredException e) {
-                    // Certificat expiré - on continue vers le renouvellement
                     System.out.println("Certificat expiré pour " + email + " - Renouvellement autorisé");
                 }
             }

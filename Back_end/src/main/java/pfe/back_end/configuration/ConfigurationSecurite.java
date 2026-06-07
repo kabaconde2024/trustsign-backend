@@ -74,7 +74,7 @@ public class ConfigurationSecurite {
                                 "/api/ia/securite/verifier-integrite-rapide"
                         ).permitAll()
 
-                        // 4. ENDPOINTS ADMIN AUDIT EXEMPTÉS (Déclarés avant la règle globale /api/admin/**)
+                        // 4. ENDPOINTS ADMIN AUDIT EXEMPTÉS
                         .requestMatchers(
                                 "/api/admin/audit/ia-data",
                                 "/api/admin/audit/test"
@@ -83,9 +83,12 @@ public class ConfigurationSecurite {
                         // 5. PROTECTION PAR AUTORITÉS (hasAuthority)
                         .requestMatchers("/api/entreprise/**").hasAuthority("ADMIN_ENTREPRISE")
                         .requestMatchers("/api/super-admin/**").hasAuthority("SUPER_ADMIN")
+                        .requestMatchers("/api/admin/pki/**").hasAuthority("SUPER_ADMIN")
+                        .requestMatchers("/api/admin/stats/**").hasAuthority("SUPER_ADMIN")
+                        .requestMatchers("/api/admin/audit/**").hasAuthority("SUPER_ADMIN")
+                        .requestMatchers("/api/admin/config").hasAuthority("SUPER_ADMIN")
                         
-                        // Tout ce qui commence par /api/admin/ requiert l'autorité SUPER_ADMIN 
-                        // (Englobe automatiquement /api/admin/stats/**, /api/admin/pki/**, etc.)
+                        // Tout ce qui commence par /api/admin/ requiert l'autorité SUPER_ADMIN
                         .requestMatchers("/api/admin/**").hasAuthority("SUPER_ADMIN")
 
                         // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION SIMPLE
@@ -120,8 +123,6 @@ public class ConfigurationSecurite {
                 "http://localhost:3000",
                 "http://localhost:8080",
                 "http://localhost:8000",
-                "https://b0f3-197-0-139-60.ngrok-free.app",
-                "https://87fd-197-0-139-60.ngrok-free.app",
                 "https://frontendmemoire.onrender.com"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

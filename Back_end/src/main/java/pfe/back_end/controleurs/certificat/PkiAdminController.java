@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/admin/pki")
 @CrossOrigin(origins = {
-        "https://localhost:3000",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://frontendmemoire.onrender.com"
 }, allowCredentials = "true")
 public class PkiAdminController {
 
@@ -46,7 +46,7 @@ public class PkiAdminController {
     @Autowired
     private ServiceNotification serviceNotification;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url:https://frontendmemoire.onrender.com}")
     private String frontendUrl;
 
     public PkiAdminController(ServiceGestionClesHSM hsmService,
@@ -64,19 +64,15 @@ public class PkiAdminController {
         System.out.println("PkiAdminController initialisé");
     }
 
-
-
     @PostMapping("/demander-confirmation/{userId}")
     public ResponseEntity<?> demanderConfirmationIdentite(@PathVariable Long userId) {
         try {
-            // Générer le token
             String token = UUID.randomUUID().toString();
             LocalDateTime expiration = LocalDateTime.now().plusHours(24);
 
             System.out.println("TOKEN: " + token);
             System.out.println("EXPIRATION: " + expiration);
 
-            // MISE À JOUR DIRECTE EN SQL
             int updated = utilisateurRepository.updateConfirmationToken(userId, token, expiration);
             System.out.println("Nombre de lignes mises à jour: " + updated);
 
@@ -84,13 +80,9 @@ public class PkiAdminController {
                 throw new RuntimeException("Échec de la mise à jour du token");
             }
 
-            // Récupérer l'utilisateur pour l'email
             Utilisateur user = utilisateurRepository.findById(userId).get();
-
-            // Vérifier que le token est bien en base
             System.out.println("Vérification: token en base = " + user.getConfirmationToken());
 
-            // Envoyer l'email
             String lienConfirmation = frontendUrl + "/confirmer-certificat?token=" + token;
             serviceNotification.envoyerLienConfirmationCertificat(
                     user.getEmail(), lienConfirmation, user.getNom(), user.getPrenom()
@@ -104,15 +96,12 @@ public class PkiAdminController {
         }
     }
 
-
-
     @GetMapping("/confirmer-identite")
     public ResponseEntity<?> confirmerIdentite(@RequestParam String token, HttpServletRequest request) {
         try {
             Utilisateur user = utilisateurRepository.findByConfirmationToken(token)
                     .orElseThrow(() -> new RuntimeException("Token invalide"));
 
-            // Vérifier l'expiration
             if (user.getConfirmationExpiration() == null || user.getConfirmationExpiration().isBefore(LocalDateTime.now())) {
                 user.setDemandeStatut("PENDING");
                 user.setConfirmationToken(null);
@@ -123,7 +112,6 @@ public class PkiAdminController {
                 ));
             }
 
-            // Confirmer l'identité
             user.setConfirme(true);
             user.setDemandeStatut("READY");
             user.setConfirmationToken(null);
@@ -144,7 +132,6 @@ public class PkiAdminController {
         }
     }
 
-
     @GetMapping("/verifier-confirmation/{userId}")
     public ResponseEntity<?> verifierConfirmation(@PathVariable Long userId) {
         try {
@@ -162,15 +149,11 @@ public class PkiAdminController {
         }
     }
 
-
-
-
     @PostMapping("/approve/{userId}")
     public ResponseEntity<?> approuverEtGenererCertificat(@PathVariable Long userId) {
         try {
             Utilisateur user = utilisateurRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
 
             if (!user.isConfirme()) {
                 return ResponseEntity.status(403).body(Map.of(
@@ -193,17 +176,10 @@ public class PkiAdminController {
             String alias = user.getEmail();
 
             hsmService.genererIdentiteSecurisee(alias);
-
-            // 2. Création CSR
             String csrPem = hsmService.creerDemandeCertification(alias, user);
-
-            // 3. Signature CA
             String certificatPem = caService.signerDemandeUtilisateur(csrPem);
-
-            // 4. Remplacer le certificat temporaire par le vrai certificat signé
             hsmService.stockerCertificatFinal(alias, certificatPem);
 
-            // 5. Mise à jour DB
             user.setCertificatPem(certificatPem);
             user.setStatusPki("ACTIVE");
             user.setHsmAlias(alias);
@@ -232,9 +208,6 @@ public class PkiAdminController {
         }
     }
 
-
-
-
     @PostMapping("/refuser/{userId}")
     public ResponseEntity<?> refuserDemande(@PathVariable Long userId) {
         try {
@@ -258,9 +231,6 @@ public class PkiAdminController {
         }
     }
 
-
-
-
     @GetMapping("/requests")
     public ResponseEntity<List<Utilisateur>> getPendingRequests() {
         List<Utilisateur> demandes = utilisateurRepository.findAllByStatusPki("PENDING");
@@ -280,7 +250,6 @@ public class PkiAdminController {
             item.put("statusPki", user.getStatusPki());
             item.put("demandeStatut", user.getDemandeStatut());
             item.put("confirme", user.isConfirme());
-            // Utiliser une date existante ou null si non disponible
             item.put("telephone", user.getTelephone());
             item.put("role", user.getRole());
             return item;
@@ -329,7 +298,58 @@ public class PkiAdminController {
         return ResponseEntity.ok(reponse);
     }
 
+    @GetMapping("/certificats")
+    public ResponseEntity<List<Map<String, Object>>> listerTousCertificats() {
+        List<Utilisateur> utilisateurs = utilisateurRepository.findAll();
+        
+        List<Map<String, Object>> reponse = utilisateurs.stream()
+                .filter(user -> user.getCertificatPem() != null || "PENDING".equals(user.getStatusPki()))
+                .map(user -> {
+                    Map<String, Object> infos = new HashMap<>();
+                    infos.put("id", user.getId());
+                    infos.put("commonName", user.getNom() + " " + user.getPrenom());
+                    infos.put("user", user.getPrenom() + " " + user.getNom());
+                    infos.put("email", user.getEmail());
+                    infos.put("status", user.getStatusPki());
+                    infos.put("dateCreation", user.getDateCreation());
+                    infos.put("certificatPem", user.getCertificatPem());
+                    
+                    if (user.getCertificatPem() != null && !"PENDING".equals(user.getStatusPki())) {
+                        try {
+                            CertificateFactory fact = CertificateFactory.getInstance("X.509");
+                            X509Certificate cer = (X509Certificate) fact.generateCertificate(
+                                    new ByteArrayInputStream(user.getCertificatPem().getBytes())
+                            );
+                            infos.put("dateEmission", cer.getNotBefore());
+                            infos.put("dateExpiration", cer.getNotAfter());
+                        } catch (Exception e) {
+                            // Ignorer
+                        }
+                    }
+                    return infos;
+                })
+                .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(reponse);
+    }
 
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
+        long total = utilisateurRepository.count();
+        long active = utilisateurRepository.countByStatusPki("ACTIVE");
+        long pending = utilisateurRepository.countByStatusPki("PENDING");
+        long expired = utilisateurRepository.countByStatusPki("EXPIRED");
+        long revoked = utilisateurRepository.countByStatusPki("REVOKED");
+        
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", total);
+        stats.put("active", active);
+        stats.put("pending", pending);
+        stats.put("expired", expired);
+        stats.put("revoked", revoked);
+        
+        return ResponseEntity.ok(stats);
+    }
 
     @GetMapping("/nettoyer-certificats-expires")
     public ResponseEntity<?> nettoyerCertificatsExpires() {
