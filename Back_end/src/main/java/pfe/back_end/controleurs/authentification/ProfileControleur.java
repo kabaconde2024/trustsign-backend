@@ -19,8 +19,8 @@ import java.util.Map;
 @RequestMapping("/api")
 @CrossOrigin(origins = {
     "https://localhost:3000",
-    "http://localhost:3000"
-  // "https://trustsign-frontend.onrender.com"
+    "http://localhost:3000",
+    "https://frontendmemoire.onrender.com"
 }, allowCredentials = "true")
 public class ProfileControleur {
 
@@ -33,8 +33,15 @@ public class ProfileControleur {
     @GetMapping("/utilisateur/mon-profil")
     public ResponseEntity<?> getMonProfil(HttpServletRequest request) {
         try {
-            String token = recupererJwtDepuisCookie(request);
-            if (token == null) return ResponseEntity.status(401).body(Map.of("erreur", "Non autorisé"));
+            // 🔧 CORRECTION : Lire le token depuis l'en-tête Authorization
+            String token = recupererJwtDepuisHeader(request);
+            if (token == null) {
+                return ResponseEntity.status(401).body(Map.of("erreur", "Non autorisé - Token manquant"));
+            }
+
+            if (!jwtUtils.validateToken(token)) {
+                return ResponseEntity.status(401).body(Map.of("erreur", "Token invalide ou expiré"));
+            }
 
             String email = jwtUtils.getEmailFromToken(token);
             Utilisateur user = utilisateurRepository.findByEmail(email)
@@ -78,8 +85,12 @@ public class ProfileControleur {
     @PutMapping("/utilisateur/modifier-profil")
     public ResponseEntity<?> updateProfil(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
-            String token = recupererJwtDepuisCookie(request);
+            String token = recupererJwtDepuisHeader(request);
             if (token == null) return ResponseEntity.status(401).body(Map.of("erreur", "Session expirée"));
+
+            if (!jwtUtils.validateToken(token)) {
+                return ResponseEntity.status(401).body(Map.of("erreur", "Token invalide"));
+            }
 
             String email = jwtUtils.getEmailFromToken(token);
             Utilisateur user = utilisateurRepository.findByEmail(email)
@@ -107,7 +118,7 @@ public class ProfileControleur {
     @PostMapping("/utilisateur/upload-photo")
     public ResponseEntity<?> uploadPhoto(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
-            String token = recupererJwtDepuisCookie(request);
+            String token = recupererJwtDepuisHeader(request);
             if (token == null) return ResponseEntity.status(401).body(Map.of("erreur", "Non autorisé"));
 
             String email = jwtUtils.getEmailFromToken(token);
@@ -128,6 +139,16 @@ public class ProfileControleur {
         }
     }
 
+    // 🔧 NOUVELLE MÉTHODE : Lire le token depuis l'en-tête Authorization
+    private String recupererJwtDepuisHeader(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    // Ancienne méthode (gardée pour compatibilité si nécessaire)
     private String recupererJwtDepuisCookie(HttpServletRequest request) {
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
