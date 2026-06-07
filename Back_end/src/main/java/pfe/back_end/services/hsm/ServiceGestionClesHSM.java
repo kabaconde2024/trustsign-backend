@@ -26,65 +26,92 @@ public class ServiceGestionClesHSM {
     private String pinUtilisateur;
 
     private Provider fournisseurPKCS11;
-
+    private static boolean hsmInitialized = false;
 
     public Provider getFournisseurPKCS11() {
         return initialiserFournisseur();
     }
 
     private Provider initialiserFournisseur() {
-        if (fournisseurPKCS11 == null) {
+        if (fournisseurPKCS11 == null || !hsmInitialized) {
             try {
+                String configContent;
                 String os = System.getProperty("os.name").toLowerCase();
-                StringBuilder configContent = new StringBuilder();
-                configContent.append("name = SoftHSM2\n");
-
+                
                 if (os.contains("win")) {
-                    configContent.append("library = C:/SoftHSM2/lib/softhsm2-x64.dll\n");
-                    configContent.append("slot = 2145520111\n");
+                    configContent = "name = SoftHSM2\nlibrary = C:/SoftHSM2/lib/softhsm2-x64.dll\nslot = 0\n";
                 } else {
-                    // IMPORTANT : Sur Render, on utilise la lib installée mais NOTRE config
-                    configContent.append("library = /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so\n");
-                    configContent.append("slotListIndex = 0\n");
+                    // Configuration pour Render/Linux
+                    configContent = "name = SoftHSM2\nlibrary = /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so\nslot = 0\n";
                 }
-
-                File tempConfig = File.createTempFile("sunpkcs11", ".cfg");
-                Files.writeString(tempConfig.toPath(), configContent.toString());
-
+                
+                File tempConfig = File.createTempFile("pkcs11", ".cfg");
+                Files.writeString(tempConfig.toPath(), configContent);
+                tempConfig.deleteOnExit();
+                
+                // Nettoyer l'ancien provider si existant
+                Provider oldProvider = Security.getProvider("SunPKCS11-SoftHSM2");
+                if (oldProvider != null) {
+                    Security.removeProvider("SunPKCS11-SoftHSM2");
+                }
+                
                 Provider p = Security.getProvider("SunPKCS11");
                 fournisseurPKCS11 = p.configure(tempConfig.getAbsolutePath());
-
-                if (Security.getProvider(fournisseurPKCS11.getName()) != null) {
-                    Security.removeProvider(fournisseurPKCS11.getName());
-                }
                 Security.addProvider(fournisseurPKCS11);
-
+                
+                // Tester la connexion au HSM
+                testHSMConnection();
+                
+                hsmInitialized = true;
                 System.out.println("✅ HSM initialisé avec succès");
+                
             } catch (Exception e) {
-
+                System.err.println("❌ Erreur initialisation HSM: " + e.getMessage());
                 e.printStackTrace();
-                throw new RuntimeException("Erreur PKCS11 : " + e.getMessage());
+                throw new RuntimeException("Erreur PKCS11 : " + e.getMessage(), e);
             }
         }
         return fournisseurPKCS11;
     }
-
-
+    
+    private void testHSMConnection() {
+        try {
+            KeyStore ks = KeyStore.getInstance("PKCS11", fournisseurPKCS11);
+            ks.load(null, pinUtilisateur.toCharArray());
+            System.out.println("✅ Connexion HSM réussie, slots disponibles");
+        } catch (Exception e) {
+            System.err.println("⚠️ Test connexion HSM échoué: " + e.getMessage());
+        }
+    }
 
     public void genererIdentiteSecurisee(String aliasUtilisateur) throws Exception {
+        // Vérifier d'abord si l'identité existe déjà
         KeyStore ks = getKeyStore();
-        if (!ks.containsAlias(aliasUtilisateur)) {
+        if (ks.containsAlias(aliasUtilisateur)) {
+            System.out.println("ℹ️ L'identité existe déjà pour: " + aliasUtilisateur);
+            return;
+        }
+        
+        try {
+            System.out.println("🔐 Génération clé RSA 2048 bits pour: " + aliasUtilisateur);
+            
             // Génération de la paire de clés RSA 2048 directement DANS le HSM
             KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", initialiserFournisseur());
-            gen.initialize(2048);
+            gen.initialize(2048, new SecureRandom());
             KeyPair paireCles = gen.generateKeyPair();
-
-            // Création d'un certificat auto-signé temporaire pour l'initialisation du KeyStore
+            
+            System.out.println("✅ Paire de clés RSA générée");
+            
+            // Création d'un certificat auto-signé temporaire
             X509Certificate certTemporaire = genererCertificatTemporaire(paireCles, aliasUtilisateur);
-
+            
             // Stockage de la clé et du certificat dans le HSM
             ks.setKeyEntry(aliasUtilisateur, paireCles.getPrivate(), null, new Certificate[]{certTemporaire});
-            System.out.println("Paire de clés et certificat temporaire générés dans le HSM : " + aliasUtilisateur);
+            System.out.println("✅ Paire de clés et certificat temporaire stockés dans le HSM");
+            
+        } catch (Exception e) {
+            System.err.println("❌ Erreur génération HSM: " + e.getMessage());
+            throw new Exception("Erreur HSM: " + e.getMessage(), e);
         }
     }
 
@@ -97,11 +124,10 @@ public class ServiceGestionClesHSM {
                         dnName,
                         new BigInteger(Long.toString(now)),
                         new Date(now),
-                        new Date(now + 31536000000L),
+                        new Date(now + 31536000000L), // 1 an
                         dnName,
                         kp.getPublic());
 
-        // La signature du certificat se fait via le HSM
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
                         .setProvider(initialiserFournisseur())
                         .build(kp.getPrivate());
@@ -110,8 +136,6 @@ public class ServiceGestionClesHSM {
                         .setProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider())
                         .getCertificate(certBuilder.build(signer));
     }
-
-
 
     public String creerDemandeCertification(String aliasUtilisateur, Utilisateur utilisateur) throws Exception {
         KeyStore ks = getKeyStore();
@@ -123,30 +147,50 @@ public class ServiceGestionClesHSM {
 
         JcaPKCS10CertificationRequestBuilder builder = new JcaPKCS10CertificationRequestBuilder(subject, clePublique);
 
-        // La CSR est signée par la clé privée qui reste dans le HSM
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
                 .setProvider(initialiserFournisseur())
                 .build(clePrivee);
 
-        return "BEGIN CERTIFICATE REQUEST\n" +
+        return "-----BEGIN CERTIFICATE REQUEST-----\n" +
                 Base64.getMimeEncoder(64, new byte[]{'\n'}).encodeToString(builder.build(signer).getEncoded()) +
-                "\nEND CERTIFICATE REQUEST";
+                "\n-----END CERTIFICATE REQUEST-----";
     }
 
-    public void stockerCertificatFinal(String aliasUtilisateur, String certificatSignePem) throws Exception {
-        KeyStore ks = getKeyStore();
-        String cleanPem = certificatSignePem.replace("BEGIN CERTIFICATE", "")
-                .replace("END CERTIFICATE", "").replaceAll("\\s", "");
-
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        X509Certificate cert = (X509Certificate) cf.generateCertificate(
-                new ByteArrayInputStream(Base64.getDecoder().decode(cleanPem)));
-
-        // Remplacement du certificat temporaire par le certificat signé par l'AC
-        PrivateKey pk = (PrivateKey) ks.getKey(aliasUtilisateur, null);
-        ks.setKeyEntry(aliasUtilisateur, pk, null, new Certificate[]{cert});
-        System.out.println("Certificat final validé et stocké dans le HSM pour l'alias : " + aliasUtilisateur);
+  public void stockerCertificatFinal(String aliasUtilisateur, String certificatSignePem) throws Exception {
+    KeyStore ks = getKeyStore();
+    
+    if (certificatSignePem == null || certificatSignePem.isEmpty()) {
+        throw new IllegalArgumentException("Le certificat Pem fourni est vide ou nul");
     }
+    
+    // 1. Nettoyage robuste : Enlève les en-têtes/pieds de page et TOUT ce qui n'est pas un caractère Base64 valide
+    String cleanPem = certificatSignePem
+            .replace("-----BEGIN CERTIFICATE-----", "")
+            .replace("-----END CERTIFICATE-----", "")
+            .replaceAll("[^a-zA-Z0-9+/=]", ""); // Garde uniquement les caractères strictement Base64
+
+    // 2. Gestion automatique du padding '=' manquant (sécurité contre le "not enough valid bits")
+    int missingPadding = cleanPem.length() % 4;
+    if (missingPadding > 0) {
+        cleanPem += "====".substring(missingPadding);
+    }
+
+    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    
+    // 3. Utilisation de getMimeDecoder() qui est beaucoup plus tolérant avec les structures de blocs
+    byte[] decodedBytes = Base64.getMimeDecoder().decode(cleanPem);
+    
+    X509Certificate cert = (X509Certificate) cf.generateCertificate(
+            new ByteArrayInputStream(decodedBytes));
+
+    PrivateKey pk = (PrivateKey) ks.getKey(aliasUtilisateur, null);
+    if (pk == null) {
+        throw new KeyStoreException("Impossible de trouver la clé privée associée à l'alias : " + aliasUtilisateur);
+    }
+    
+    ks.setKeyEntry(aliasUtilisateur, pk, null, new Certificate[]{cert});
+    System.out.println("✅ Certificat final stocké avec succès dans le HSM");
+}
 
     public PrivateKey recupererClePrivee(String alias) throws Exception {
         return (PrivateKey) getKeyStore().getKey(alias, null);
@@ -159,44 +203,35 @@ public class ServiceGestionClesHSM {
 
     private KeyStore getKeyStore() throws Exception {
         Provider p = initialiserFournisseur();
-        // Spécification explicite du type PKCS11
         KeyStore ks = KeyStore.getInstance("PKCS11", p);
-        // Chargement du KeyStore avec le PIN utilisateur SoftHSM2
         ks.load(null, pinUtilisateur.toCharArray());
         return ks;
     }
 
-    /*
-     Vérifie et crée automatiquement l'identité HSM pour un utilisateur
-      Cette méthode est appelée par le contrôleur avant la signature
-     */
     public void verifierOuCreerIdentite(String aliasUtilisateur, Utilisateur utilisateur) {
         try {
-            System.out.println("Vérification identité HSM pour: " + aliasUtilisateur);
+            System.out.println("🔍 Vérification identité HSM pour: " + aliasUtilisateur);
 
-            // Vérifier si le KeyStore existe et contient l'alias
             KeyStore ks = getKeyStore();
 
             if (!ks.containsAlias(aliasUtilisateur)) {
                 System.out.println("   - Alias non trouvé, création d'une nouvelle identité...");
                 genererIdentiteSecurisee(aliasUtilisateur);
 
-                // Mettre à jour l'utilisateur avec le statut ACTIVE
                 utilisateur.setStatusPki("ACTIVE");
                 utilisateur.setHsmAlias(aliasUtilisateur);
 
-                System.out.println("Identité HSM créée avec succès pour: " + aliasUtilisateur);
+                System.out.println("✅ Identité HSM créée avec succès pour: " + aliasUtilisateur);
             } else {
-                System.out.println("Identité HSM existante trouvée pour: " + aliasUtilisateur);
+                System.out.println("ℹ️ Identité HSM existante trouvée pour: " + aliasUtilisateur);
 
-                // Vérifier si le statut est ACTIVE, sinon le mettre à jour
                 if (!"ACTIVE".equals(utilisateur.getStatusPki())) {
                     utilisateur.setStatusPki("ACTIVE");
                     System.out.println("Statut PKI mis à jour: ACTIVE");
                 }
             }
         } catch (Exception e) {
-            System.err.println("Erreur lors de la vérification/création de l'identité HSM: " + e.getMessage());
+            System.err.println("❌ Erreur HSM: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Erreur HSM: " + e.getMessage(), e);
         }
