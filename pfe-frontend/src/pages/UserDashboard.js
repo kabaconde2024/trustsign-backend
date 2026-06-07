@@ -66,19 +66,19 @@ const UserDashboard = () => {
     if (view === 'transactions') fetchTransactions(); 
   }, [view]);
 
-  const fetchUserProfile = async () => {
+const fetchUserProfile = async () => {
     try {
-      const response = await API.get('/api/utilisateur/mon-profil');
-      setUserData(response.data);
+        const response = await API.get('/api/utilisateur/mon-profil');
+        setUserData(response.data);
     } catch (error) { 
-      console.error("Erreur profil:", error); 
-      if (error.response?.status === 403 || error.response?.status === 401) {
-        // Token invalide ou expiré
-        localStorage.clear();
-        window.location.href = '/';
-      }
+        console.error("Erreur profil:", error); 
+        if (error.response?.status === 403 || error.response?.status === 401) {
+            // 🔴 ICI ! C'est ce qui efface le token
+            localStorage.clear();
+            window.location.href = '/';
+        }
     }
-  };
+};
 
   const fetchTransactions = async () => {
     setLoadingTransactions(true);
