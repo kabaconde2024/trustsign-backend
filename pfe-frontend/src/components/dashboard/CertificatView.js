@@ -29,7 +29,7 @@ const CertificatView = ({ currentStatus, onStatusRefresh, setSnackbar, isMobile 
 
     // 🛠️ Centralisation de la récupération du Token JWT
     const getHeaders = () => {
-        const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');   // ← au lieu de 'token'
         return {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})

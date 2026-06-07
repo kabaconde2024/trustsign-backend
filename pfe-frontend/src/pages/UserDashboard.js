@@ -22,7 +22,20 @@ import SignaturesView from '../components/Simples/SignaturesView';
 import StepConfig from '../components/Simples/StepConfig';
 import TransactionsView from '../components/Simples/TransactionsView';
 
-// ⭐ IMPORT DES COMPOSANTS IA EN FRANÇAIS
+// Configuration axios avec intercepteur pour ajouter le token
+const API = axios.create({
+  baseURL: 'https://backendmemoire.onrender.com',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+// Intercepteur pour ajouter le token à chaque requête
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 const UserDashboard = () => {
   const [view, setView] = useState('signatures');
@@ -38,11 +51,9 @@ const UserDashboard = () => {
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   
-  // ⭐ ÉTAT POUR L'ANALYSE DE DOCUMENT
   const [documentSelectionne, setDocumentSelectionne] = useState(null);
   const [openAnalyse, setOpenAnalyse] = useState(false);
   
-  // Responsive states
   const isMobile = useMediaQuery('(max-width:600px)');
   const isTablet = useMediaQuery('(max-width:960px)');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -57,17 +68,22 @@ const UserDashboard = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get('https://backendmemoire.onrender.com/api/utilisateur/mon-profil', { withCredentials: true });
+      const response = await API.get('/api/utilisateur/mon-profil');
       setUserData(response.data);
     } catch (error) { 
       console.error("Erreur profil:", error); 
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        // Token invalide ou expiré
+        localStorage.clear();
+        window.location.href = '/';
+      }
     }
   };
 
   const fetchTransactions = async () => {
     setLoadingTransactions(true);
     try {
-      const response = await axios.get('https://backendmemoire.onrender.com/api/documents/mes-invitations', { withCredentials: true });
+      const response = await API.get('/api/documents/mes-invitations');
       setTransactions(response.data);
     } catch (error) {
       setSnackbar({ open: true, message: "Erreur lors de la récupération des transactions.", severity: 'error' });
@@ -83,10 +99,9 @@ const UserDashboard = () => {
     }
   };
 
-  
   const handleUpdateProfil = async () => {
     try {
-      await axios.put('https://backendmemoire.onrender.com/api/utilisateur/modifier-profil', userData, { withCredentials: true });
+      await API.put('/api/utilisateur/modifier-profil', userData);
       setSnackbar({ open: true, message: 'Profil mis à jour !', severity: 'success' });
       setIsEditing(false);
     } catch (error) {
@@ -100,10 +115,10 @@ const UserDashboard = () => {
       return;
     }
     try {
-      await axios.put('https://backendmemoire.onrender.com/api/utilisateur/modifier-mot-de-passe', {
+      await API.put('/api/utilisateur/modifier-mot-de-passe', {
         ancienMotDePasse: passwordData.oldPassword,
         nouveauMotDePasse: passwordData.newPassword
-      }, { withCredentials: true });
+      });
       setSnackbar({ open: true, message: "Mot de passe modifié avec succès !", severity: 'success' });
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
@@ -125,9 +140,13 @@ const UserDashboard = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // Upload du fichier
       const uploadResponse = await axios.post('https://backendmemoire.onrender.com/api/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
       });
       
       const payload = {
@@ -142,7 +161,7 @@ const UserDashboard = () => {
         typeSignature: typeSig
       };
       
-      await axios.post('https://backendmemoire.onrender.com/api/signature/creer-transaction', payload, { withCredentials: true });
+      await API.post('/api/signature/creer-transaction', payload);
       
       setSnackbar({ 
         open: true, 
@@ -154,6 +173,7 @@ const UserDashboard = () => {
       setAddedSignataires([]);
       if (isMobile) setMobileOpen(false);
     } catch (error) {
+      console.error("Erreur:", error);
       setSnackbar({ open: true, message: "Erreur lors de l'envoi de l'invitation.", severity: 'error' });
     }
   };
@@ -168,13 +188,11 @@ const UserDashboard = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  // ⭐ Fonction pour analyser un document depuis les transactions
   const handleAnalyserDocument = (document) => {
     setDocumentSelectionne(document);
     setOpenAnalyse(true);
   };
 
-  // Styles responsives
   const mainContentStyles = {
     flexGrow: 1,
     width: { xs: '100%', sm: '100%', md: `calc(100% - 240px)` },
@@ -193,7 +211,6 @@ const UserDashboard = () => {
     <Box sx={{ display: 'flex', bgcolor: '#f4f7f9', minHeight: '100vh' }}>
       <CssBaseline />
       
-      {/* Mobile App Bar */}
       {isMobile && (
         <AppBar 
           position="fixed" 
@@ -226,7 +243,6 @@ const UserDashboard = () => {
         </AppBar>
       )}
 
-      {/* Sidebar with responsive drawer */}
       <Sidebar 
         view={view} 
         setView={(newView) => {
@@ -246,9 +262,7 @@ const UserDashboard = () => {
         isTablet={isTablet}
       />
       
-      {/* Main Content */}
       <Box component="main" sx={mainContentStyles}>
-        {/* Header Desktop */}
         {!isMobile && (
           <Header 
             setView={setView} 
@@ -258,12 +272,7 @@ const UserDashboard = () => {
           />
         )}
         
-        {/* Content Container */}
         <Container maxWidth="xl" sx={contentContainerStyles}>
-          
-          
-
-          {/* Vue Signatures */}
           {view === 'signatures' && (
             <Box sx={{ width: '100%' }}>
               {step === 1 && (
@@ -294,7 +303,6 @@ const UserDashboard = () => {
             </Box>
           )}
 
-          {/* Vue Transactions avec analyse IA */}
           {view === 'transactions' && (
             <TransactionsView 
               invitations={transactions} 
@@ -305,7 +313,6 @@ const UserDashboard = () => {
             />
           )}
 
-          {/* Vue Certificat */}
           {view === 'certificat' && (
             <CertificatView 
               currentStatus={userData.status_pki || userData.statut}
@@ -316,7 +323,6 @@ const UserDashboard = () => {
             />
           )}
 
-          {/* Vue Mes informations */}
           {view === 'mes-informations' && (
             <ProfileView 
               userData={userData} 
@@ -330,7 +336,6 @@ const UserDashboard = () => {
             />
           )}
 
-          {/* Vue Sécurité */}
           {view === 'securite' && (
             <SecurityView 
               passwordData={passwordData} 
@@ -341,7 +346,6 @@ const UserDashboard = () => {
             />
           )}
           
-          {/* Vue Ma signature */}
           {view === 'ma-signature' && (
             <SignatureView 
               setSnackbar={setSnackbar}
@@ -351,7 +355,6 @@ const UserDashboard = () => {
             />
           )}
 
-          {/* Vue Auto-signature */}
           {view === 'auto-signature' && (
             <AutoSignatureDocument 
               setSnackbar={setSnackbar} 
@@ -360,7 +363,6 @@ const UserDashboard = () => {
             />
           )}
           
-          {/* Vue Liste auto-signés */}
           {view === 'liste-auto-signe' && (
             <ListeDocumentsAutoSigne 
               setSnackbar={setSnackbar} 
@@ -371,9 +373,6 @@ const UserDashboard = () => {
         </Container>
       </Box>
 
-     
-
-      {/* Snackbar */}
       <Snackbar 
         open={snackbar.open} 
         autoHideDuration={4000} 
