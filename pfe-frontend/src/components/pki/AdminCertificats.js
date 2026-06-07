@@ -11,7 +11,7 @@ import {
     VerifiedUser, Pending, Shield, 
     Cancel, Close as CloseIcon
 } from '@mui/icons-material';
-import axios from 'axios'; // ← Importation directe d'axios
+import axios from 'axios';
 
 const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) => {
     const [certStats, setCertStats] = useState({
@@ -24,17 +24,17 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const [loading, setLoading] = useState(true);
     const [openActionDialog, setOpenActionDialog] = useState(false);
     const [certificatSelectionne, setCertificatSelectionne] = useState(null);
-    const [actionType, setActionType] = useState(''); // 'approve' ou 'revoke'
+    const [actionType, setActionType] = useState('');
 
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
-    // URL du backend sur Render définie en dur
     const BACKEND_URL = 'https://backendmemoire.onrender.com/api';
 
-    // Configuration manuelle des en-têtes avec le Token pour les requêtes de lecture
+    // ✅ CORRECTION : Récupère 'accessToken' (pas 'token')
     const getHeaders = () => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('accessToken');  // ← CHANGEMENT ICI
+        console.log('Token récupéré:', token ? 'Présent' : 'Absent');  // ← DEBUG
         return {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -44,10 +44,11 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
     const loadData = async () => {
         setLoading(true);
         try {
-            // Requêtes HTTP directes vers Render avec injection manuelle du token
+            const headers = getHeaders();
+            
             const [statsRes, listRes] = await Promise.all([
-                axios.get(`${BACKEND_URL}/admin/pki/stats`, { headers: getHeaders() }),
-                axios.get(`${BACKEND_URL}/admin/pki/certificats`, { headers: getHeaders() })
+                axios.get(`${BACKEND_URL}/admin/pki/stats`, { headers }),
+                axios.get(`${BACKEND_URL}/admin/pki/certificats`, { headers })
             ]);
 
             setCertStats({
@@ -58,11 +59,11 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
             });
             setCertificatesList(listRes.data || []);
         } catch (error) {
-            console.error("Erreur chargement données PKI via URL directe:", error);
+            console.error("Erreur chargement données PKI:", error);
             if (setSnackbar) {
                 setSnackbar({ 
                     open: true, 
-                    message: "Erreur d'authentification ou accès refusé (403)", 
+                    message: error.response?.status === 403 ? "Accès non autorisé. Veuillez vous reconnecter." : "Erreur chargement des certificats", 
                     severity: 'error' 
                 });
             }
@@ -83,7 +84,6 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
 
     const handleProcessAction = async (id, statusAction) => {
         try {
-            // Appel PUT direct vers Render utilisant les en-têtes d'autorisation manuels
             await axios.put(
                 `${BACKEND_URL}/admin/pki/certificats/${id}`, 
                 { status: statusAction },
@@ -98,9 +98,9 @@ const AdminCertificats = ({ setSnackbar, isMobile = false, isTablet = false }) =
                 });
             }
             setOpenActionDialog(false);
-            loadData(); // Rechargement forcé du registre
+            loadData();
         } catch (error) {
-            console.error("Erreur modification statut via URL directe:", error);
+            console.error("Erreur modification statut:", error);
             if (setSnackbar) {
                 setSnackbar({ open: true, message: "Action non autorisée ou erreur serveur", severity: 'error' });
             }
