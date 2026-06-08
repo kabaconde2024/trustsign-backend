@@ -9,9 +9,10 @@ import pfe.back_end.repositories.sql.UtilisateurRepository;
 import pfe.back_end.services.audit.ServiceAudit;
 
 import java.io.ByteArrayInputStream;
-import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,6 +29,24 @@ public class PkiUtilisateurControleur {
 
     @Autowired
     private ServiceAudit serviceAudit;
+
+    /**
+     * Nettoie une chaîne PEM pour en extraire uniquement les données Base64 pures.
+     */
+    private byte[] extraireOctetsCertificat(String pemRaw) throws IllegalArgumentException {
+        if (pemRaw == null || pemRaw.isEmpty()) {
+            throw new IllegalArgumentException("Le certificat PEM est vide.");
+        }
+        // Supprime les en-têtes/pieds personnalisés ou standards (et tous les espaces/retours à la ligne)
+        String pemClean = pemRaw
+                .replaceAll("-+BEGIN CERTIFICATE-+", "")
+                .replaceAll("-+END CERTIFICATE-+", "")
+                .replaceAll("Debut\\s+Certificat", "")
+                .replaceAll("Fin\\s+Certificat", "")
+                .replaceAll("\\s", ""); // Supprime \n, \r, espaces et tabulations
+
+        return Base64.getDecoder().decode(pemClean);
+    }
 
     @PostMapping("/request-certificate")
     public ResponseEntity<?> requestCertificate(Authentication auth) {
@@ -90,11 +109,7 @@ public class PkiUtilisateurControleur {
             if (user.getCertificatPem() != null && !user.getCertificatPem().isEmpty()) {
                 try {
                     CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                    String pemClean = user.getCertificatPem()
-                            .replace("Debut  Certificat", "")
-                            .replace("Fin  Certificat", "")
-                            .replaceAll("\\s", "");
-                    byte[] certBytes = java.util.Base64.getDecoder().decode(pemClean);
+                    byte[] certBytes = extraireOctetsCertificat(user.getCertificatPem());
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certBytes));
 
                     response.put("dateEmission", cert.getNotBefore());
@@ -104,7 +119,9 @@ public class PkiUtilisateurControleur {
                     response.put("numeroSerie", cert.getSerialNumber().toString(16).toUpperCase());
 
                 } catch (Exception e) {
-                    System.err.println("Erreur lecture certificat: " + e.getMessage());
+                    System.err.println("Erreur lecture certificat pour " + email + ": " + e.getMessage());
+                    // On ne bloque pas la réponse entière si seul le parsing de la carte d'identité du cert échoue
+                    response.put("erreurParsingCertificat", "Impossible de décoder les détails du certificat.");
                 }
             }
 
@@ -123,7 +140,7 @@ public class PkiUtilisateurControleur {
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             String currentStatus = user.getStatusPki();
-            System.out.println("Statut actuel: " + currentStatus);
+            System.out.println("Statut actuel pour renouvellement: " + currentStatus);
 
             if ("PENDING".equals(currentStatus)) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -134,22 +151,23 @@ public class PkiUtilisateurControleur {
             if ("ACTIVE".equals(currentStatus) && user.getCertificatPem() != null) {
                 try {
                     CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                    String pemClean = user.getCertificatPem()
-                            .replace("Debut Certificat", "")
-                            .replace("Fin  Certificat", "")
-                            .replaceAll("\\s", "");
-                    byte[] certBytes = java.util.Base64.getDecoder().decode(pemClean);
+                    byte[] certBytes = extraireOctetsCertificat(user.getCertificatPem());
                     X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certBytes));
+                    
+                    // Vérifie si le certificat est valide à l'instant T
                     cert.checkValidity();
 
+                    // Si aucune exception n'est levée, le certificat est encore valide
                     return ResponseEntity.badRequest().body(Map.of(
                             "message", "Votre certificat est encore valide jusqu'au " + cert.getNotAfter()
                     ));
-                } catch (CertificateExpiredException e) {
-                    System.out.println("Certificat expiré pour " + email + " - Renouvellement autorisé");
+                } catch (CertificateException e) {
+                    // Attrape CertificateExpiredException et CertificateNotYetValidException
+                    System.out.println("Certificat non valide ou expiré pour " + email + " - Renouvellement autorisé. Motif: " + e.getMessage());
                 }
             }
 
+            // Mise à jour du statut pour la validation administrative
             user.setStatusPki("PENDING");
             user.setCertificatPem(null);
             utilisateurRepository.save(user);
@@ -157,7 +175,7 @@ public class PkiUtilisateurControleur {
             serviceAudit.logRenouvellementCertificat(user.getId(), email, "PENDING",
                     "Demande de renouvellement de certificat (ancien statut: " + currentStatus + ")");
 
-            System.out.println("Demande de renouvellement enregistrée pour: " + email);
+            System.out.println("Demande de renouvellement enregistrée avec succès pour: " + email);
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
