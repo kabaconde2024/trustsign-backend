@@ -70,7 +70,7 @@ public class ConfigurationSecurite {
                                 "/api/invitations/verifier/**"
                         ).permitAll()
 
-                        // 3. ENDPOINTS IA PUBLICS (Attention aux endpoints sensibles passés ici)
+                        // 3. ENDPOINTS IA PUBLICS
                         .requestMatchers(
                                 "/api/ia/logs/public",
                                 "/api/ia/health",
@@ -83,7 +83,7 @@ public class ConfigurationSecurite {
                                 "/api/admin/audit/test"
                         ).permitAll()
 
-                        // 5. PROTECTION PAR AUTORITÉS (L'ordre compte : du plus spécifique au plus général)
+                        // 5. PROTECTION PAR AUTORITÉS
                         .requestMatchers("/api/entreprise/**").hasAuthority("ADMIN_ENTREPRISE")
                         .requestMatchers("/api/super-admin/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/pki/**").hasAuthority("SUPER_ADMIN")
@@ -92,14 +92,15 @@ public class ConfigurationSecurite {
                         .requestMatchers("/api/admin/config").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/**").hasAuthority("SUPER_ADMIN")
 
-                        // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION REQUSE
+                        // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION REQUISE (Ordre et isolation appliqués)
+                        .requestMatchers("/api/utilisateur/**").authenticated() // 🔒 Isolé en amont pour éviter les conflits d'intercepteurs
                         .requestMatchers(
                                 "/api/signature/quota/mon-quota",
                                 "/api/ia/securite/analyser-falsification",
                                 "/api/ia/securite/analyser-document/**",
                                 "/api/ia/analyse-document/**",
-                                "/api/ia/anomalies", // 🔒 Déplacé ici pour des raisons de sécurité
-                                "/api/ia/rapports",   // 🔒 Déplacé ici pour des raisons de sécurité
+                                "/api/ia/anomalies", 
+                                "/api/ia/rapports",   
                                 "/api/signature/quota/utilisateur/**",
                                 "/api/signature/quota/reinitialiser/**",
                                 "/api/signature/quota/modifier-limite/**",
@@ -108,8 +109,7 @@ public class ConfigurationSecurite {
                                 "/api/documents/verifier-signature-pki",
                                 "/api/documents/download-signe/**",
                                 "/api/signature/appliquer-auto-signature",
-                                "/api/documents/**",
-                                "/api/utilisateur/**"
+                                "/api/documents/**"
                         ).authenticated()
 
                         .anyRequest().authenticated()
@@ -124,7 +124,7 @@ public class ConfigurationSecurite {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
-                "https://localhost:3000", // Unifié avec le contrôleur
+                "https://localhost:3000", 
                 "http://localhost:8080",
                 "http://localhost:8000",
                 "https://frontendmemoire.onrender.com"

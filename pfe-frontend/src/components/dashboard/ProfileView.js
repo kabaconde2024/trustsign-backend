@@ -54,9 +54,17 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
     const handleSavePhoto = async () => {
         setUploading(true);
         try {
+            // 🔑 Extraction du token pour l'architecture Stateless
+            const token = localStorage.getItem('token'); 
+
             await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
                 { photo: tempPhoto },
-                { withCredentials: true }
+                { 
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
             setUserData({ ...userData, photoProfil: tempPhoto });
             setOpenPhotoDialog(false);
@@ -72,9 +80,17 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
     const handleDeletePhoto = async () => {
         setUploading(true);
         try {
+            // 🔑 Extraction du token pour l'architecture Stateless
+            const token = localStorage.getItem('token'); 
+
             await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
                 { photo: null },
-                { withCredentials: true }
+                { 
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
             setUserData({ ...userData, photoProfil: null });
             setTempPhoto(null);
@@ -273,7 +289,7 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
                 </Paper>
             </Grow>
 
-            <Dialog open={openPhotoDialog} onClose={() => setOpenPhotoDialog(false)} maxWidth="sm" fullWidth>
+            <Dialog open={openPhotoDialog} onClose={() => setOpenPhotoDialog(false)} maxWidth="sm" fullWidth disableEnforceFocus>
                 <DialogTitle sx={{ bgcolor: '#1a237e', color: 'white', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                     Aperçu de la photo
                 </DialogTitle>
@@ -307,6 +323,7 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
                 maxWidth="md"
                 fullWidth
                 TransitionComponent={Fade}
+                disableEnforceFocus
                 PaperProps={{ sx: { bgcolor: 'rgba(0,0,0,0.95)', borderRadius: '20px', margin: { xs: 2, sm: 'auto' } } }}
             >
                 <DialogTitle sx={{ bgcolor: 'transparent', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -320,21 +337,12 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
                         <Zoom in={true}>
                             <img 
                                 src={userData.photoProfil} 
-                                alt="Photo de profil" 
-                                style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: '20px', objectFit: 'contain' }} 
-                                onClick={() => setOpenFullscreenDialog(false)}
+                                alt="Profil Plein Écran" 
+                                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px', objectFit: 'contain' }} 
                             />
                         </Zoom>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ justifyContent: 'center', p: 2 }}>
-                    <Button onClick={() => setOpenFullscreenDialog(false)} sx={{ color: 'white' }}>Fermer</Button>
-                    {isEditing && (
-                        <Button variant="contained" startIcon={<PhotoCamera />} onClick={() => { setOpenFullscreenDialog(false); handlePhotoClick(); }} sx={{ bgcolor: '#ffc107', color: '#0b1e39' }}>
-                            Changer la photo
-                        </Button>
-                    )}
-                </DialogActions>
             </Dialog>
         </Box>
     );
