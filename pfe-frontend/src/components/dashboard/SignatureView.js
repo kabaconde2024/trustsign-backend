@@ -2,23 +2,44 @@ import React, { useRef, useState, useEffect } from 'react';
 import { 
     Box, Paper, Typography, Button, Stack, Grid, 
     Dialog, DialogTitle, DialogContent, DialogActions, 
-    CircularProgress, Zoom, Fade, useMediaQuery,
-    IconButton // 🔥 Ajouté ici pour corriger l'erreur de compilation Render
+    CircularProgress, Zoom, Fade, useMediaQuery, IconButton
 } from '@mui/material';
 import { Delete, CloudUpload, Draw, CheckCircle, Close } from '@mui/icons-material';
 import SignatureCanvas from 'react-signature-canvas';
 import axios from 'axios';
 
-const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false }) => {
+// Utilisation d'un fallback local si userData ou setUserData ne sont pas fournis par le parent
+const SignatureView = ({ userData: propsUserData, setUserData: propsSetUserData, setSnackbar, onSignatureSaved, isMobile = false }) => {
     const [openDrawDialog, setOpenDrawDialog] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [loadingProfil, setLoadingProfil] = useState(true);
+    
+    // 🛡️ État local de secours si le composant n'est pas alimenté par le parent
+    const [localUserData, setLocalUserData] = useState({ imageSignature: null });
+    
+    // Déterminer dynamiquement si on utilise les données du parent ou locales
+    const currentUserData = propsUserData || localUserData;
+
     const sigPad = useRef({});
     const fileInputRef = useRef(null);
     const isSmallScreen = useMediaQuery('(max-width:600px)');
     const mobile = isMobile || isSmallScreen;
 
-    // 🔄 Récupération du profil au chargement du composant (avec Token)
+    // Fonction unifiée pour mettre à jour l'état (Parent ou Local)
+    const updateSignatureState = (base64Data) => {
+        if (propsSetUserData && typeof propsSetUserData === 'function') {
+            propsSetUserData({ ...propsUserData, imageSignature: base64Data });
+        } else {
+            setLocalUserData(prev => ({ ...prev, imageSignature: base64Data }));
+        }
+        
+        // Déclencher le callback du nouveau dashboard si présent
+        if (onSignatureSaved && typeof onSignatureSaved === 'function') {
+            onSignatureSaved();
+        }
+    };
+
+    // 🔄 Récupération du profil autonome au chargement
     useEffect(() => {
         const fetchUserProfile = async () => {
             try {
@@ -31,13 +52,16 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                 }
 
                 const response = await axios.get('https://backendmemoire.onrender.com/api/utilisateur/mon-profil', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
                 if (response.data) {
-                    setUserData(response.data);
+                    // Si le parent fournit un setter valide, on met à jour le parent, sinon le local
+                    if (propsSetUserData && typeof propsSetUserData === 'function') {
+                        propsSetUserData(response.data);
+                    } else {
+                        setLocalUserData(response.data);
+                    }
                 }
             } catch (error) {
                 console.error("Erreur vérification signature:", error);
@@ -47,7 +71,7 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
         };
 
         fetchUserProfile();
-    }, [setUserData]);
+    }, [propsSetUserData, propsUserData]);
 
     const handleClear = () => {
         sigPad.current.clear();
@@ -57,11 +81,11 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
         const file = event.target.files[0];
         if (file) {
             if (file.size > 1 * 1024 * 1024) {
-                setSnackbar({ open: true, message: "L'image est trop volumineuse. Taille maximale: 1MB", severity: 'error' });
+                if (setSnackbar) setSnackbar({ open: true, message: "L'image est trop volumineuse. Taille maximale: 1MB", severity: 'error' });
                 return;
             }
             if (!file.type.startsWith('image/')) {
-                setSnackbar({ open: true, message: "Veuillez sélectionner une image valide (PNG ou JPEG)", severity: 'error' });
+                if (setSnackbar) setSnackbar({ open: true, message: "Veuillez sélectionner une image valide (PNG ou JPEG)", severity: 'error' });
                 return;
             }
             const reader = new FileReader();
@@ -72,14 +96,14 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
         }
     };
 
-    // 💾 Sauvegarde globale de la signature (avec Token)
+    // 💾 Sauvegarde globale de la signature (Stateless Bearer Token)
     const handleSaveSignatureBackend = async (base64Data) => {
         setUploading(true);
         try {
             const token = localStorage.getItem('token') || localStorage.getItem('jwt') || localStorage.getItem('accessToken');
 
             if (!token) {
-                setSnackbar({ open: true, message: "❌ Session expirée. Veuillez vous reconnecter.", severity: 'error' });
+                if (setSnackbar) setSnackbar({ open: true, message: "❌ Session expirée. Veuillez vous reconnecter.", severity: 'error' });
                 setUploading(false);
                 return;
             }
@@ -94,12 +118,12 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                 }
             );
 
-            setUserData({ ...userData, imageSignature: base64Data });
+            updateSignatureState(base64Data);
             setOpenDrawDialog(false);
-            setSnackbar({ open: true, message: "✅ Signature enregistrée avec succès", severity: 'success' });
+            if (setSnackbar) setSnackbar({ open: true, message: "✅ Signature enregistrée avec succès", severity: 'success' });
         } catch (error) {
             console.error("Erreur save signature:", error);
-            setSnackbar({ open: true, message: "❌ Erreur lors de l'enregistrement de la signature", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "❌ Erreur lors de l'enregistrement de la signature", severity: 'error' });
         } finally {
             setUploading(false);
         }
@@ -107,7 +131,7 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
 
     const handleSaveDraw = () => {
         if (sigPad.current.isEmpty()) {
-            setSnackbar({ open: true, message: "Veuillez dessiner votre signature avant d'enregistrer", severity: 'warning' });
+            if (setSnackbar) setSnackbar({ open: true, message: "Veuillez dessiner votre signature avant d'enregistrer", severity: 'warning' });
             return;
         }
         const dataUrl = sigPad.current.getTrimmedCanvas().toDataURL('image/png');
@@ -129,11 +153,11 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                 }
             );
 
-            setUserData({ ...userData, imageSignature: null });
-            setSnackbar({ open: true, message: "✅ Signature supprimée", severity: 'success' });
+            updateSignatureState(null);
+            if (setSnackbar) setSnackbar({ open: true, message: "✅ Signature supprimée", severity: 'success' });
         } catch (error) {
             console.error("Erreur suppression signature:", error);
-            setSnackbar({ open: true, message: "❌ Erreur lors de la suppression de la signature", severity: 'error' });
+            if (setSnackbar) setSnackbar({ open: true, message: "❌ Erreur lors de la suppression de la signature", severity: 'error' });
         } finally {
             setUploading(false);
         }
@@ -176,10 +200,10 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                                     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
                                 }}
                             >
-                                {userData.imageSignature ? (
+                                {currentUserData && currentUserData.imageSignature ? (
                                     <Zoom in={true}>
                                         <img 
-                                            src={userData.imageSignature} 
+                                            src={currentUserData.imageSignature} 
                                             alt="Signature électronique" 
                                             style={{ maxWidth: '90%', maxHeight: '80%', objectFit: 'contain' }}
                                         />
@@ -234,7 +258,7 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                                     onChange={handleFileChange}
                                 />
 
-                                {userData.imageSignature && (
+                                {currentUserData && currentUserData.imageSignature && (
                                     <Button 
                                         variant="text" 
                                         color="error"
