@@ -66,7 +66,7 @@ const UserDashboard = () => {
     if (view === 'transactions') fetchTransactions(); 
   }, [view]);
 
-const fetchUserProfile = async () => {
+  const fetchUserProfile = async () => {
     try {
         const token = localStorage.getItem('accessToken');
         console.log('[fetchUserProfile] Token présent:', !!token);
@@ -99,7 +99,7 @@ const fetchUserProfile = async () => {
             statut: 'UNKNOWN' 
         });
     }
-};
+  };
 
   const fetchTransactions = async () => {
     setLoadingTransactions(true);
@@ -162,11 +162,10 @@ const fetchUserProfile = async () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      // Upload du fichier
-      const uploadResponse = await axios.post('https://backendmemoire.onrender.com/api/documents/upload', formData, {
+      // 🔥 Modification apportée : Utilisation de l'instance centralisée API pour éviter la rupture Stateless 
+      const uploadResponse = await API.post('/api/documents/upload', formData, {
         headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          'Content-Type': 'multipart/form-data'
         }
       });
       
