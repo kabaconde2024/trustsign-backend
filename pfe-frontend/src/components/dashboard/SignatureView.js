@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { 
     Box, Paper, Typography, Button, Stack, Grid, 
     Dialog, DialogTitle, DialogContent, DialogActions, 
-    CircularProgress, Zoom, Fade, useMediaQuery 
+    CircularProgress, Zoom, Fade, useMediaQuery,
+    IconButton // 🔥 Ajouté ici pour corriger l'erreur de compilation Render
 } from '@mui/material';
 import { Delete, CloudUpload, Draw, CheckCircle, Close } from '@mui/icons-material';
 import SignatureCanvas from 'react-signature-canvas';
@@ -251,7 +252,7 @@ const SignatureView = ({ userData, setUserData, setSnackbar, isMobile = false })
                 </Paper>
             </Fade>
 
-            {/* Dialog de Dessin Réutilisé */}
+            {/* Dialog de Dessin */}
             <Dialog 
                 open={openDrawDialog} 
                 onClose={() => setOpenDrawDialog(false)}
