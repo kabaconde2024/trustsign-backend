@@ -51,32 +51,42 @@ const ProfileView = ({ userData, setUserData, isEditing, setIsEditing, handleUpd
         }
     };
 
-    const handleSavePhoto = async () => {
-        setUploading(true);
-        try {
-            // 🔑 Extraction du token pour l'architecture Stateless
-            const token = localStorage.getItem('token'); 
+  const handleSavePhoto = async () => {
+    setUploading(true);
+    try {
+        // 🔍 Tentative de récupération sous les clés les plus courantes
+        const token = localStorage.getItem('token') || 
+                      localStorage.getItem('jwt') || 
+                      localStorage.getItem('accessToken'); 
 
-            await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
-                { photo: tempPhoto },
-                { 
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-            setUserData({ ...userData, photoProfil: tempPhoto });
-            setOpenPhotoDialog(false);
-            setSnackbar({ open: true, message: "✅ Photo de profil mise à jour", severity: 'success' });
-        } catch (error) {
-            console.error("Erreur upload photo:", error);
-            setSnackbar({ open: true, message: "❌ Erreur lors de l'upload de la photo", severity: 'error' });
-        } finally {
+        // 🛡️ Log de sécurité pour débugger proprement
+        console.log("Token extrait pour upload-photo :", token ? "Présent (commence par " + token.substring(0, 10) + "...)" : "INTROUVABLE ❌");
+
+        if (!token) {
+            setSnackbar({ open: true, message: "❌ Session expirée ou jeton introuvable. Veuillez vous reconnecter.", severity: 'error' });
             setUploading(false);
+            return;
         }
-    };
 
+        await axios.post('https://backendmemoire.onrender.com/api/utilisateur/upload-photo', 
+            { photo: tempPhoto },
+            { 
+                headers: {
+                    'Authorization': `Bearer ${token}`, // Injecté dynamiquement
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        setUserData({ ...userData, photoProfil: tempPhoto });
+        setOpenPhotoDialog(false);
+        setSnackbar({ open: true, message: "✅ Photo de profil mise à jour", severity: 'success' });
+    } catch (error) {
+        console.error("Erreur de réponse du serveur (Status " + error.response?.status + ") :", error.response?.data);
+        setSnackbar({ open: true, message: "❌ Erreur lors de l'upload de la photo", severity: 'error' });
+    } finally {
+        setUploading(false);
+    }
+};
     const handleDeletePhoto = async () => {
         setUploading(true);
         try {
