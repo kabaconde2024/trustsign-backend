@@ -1,46 +1,40 @@
 package pfe.back_end.controleurs.authentification;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import pfe.back_end.configuration.ServiceJwt;
 import pfe.back_end.modeles.entites.Utilisateur;
 import pfe.back_end.repositories.sql.UtilisateurRepository;
 
-import java.io.IOException;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {
-    "https://localhost:3000",
-    "http://localhost:3000",
-    "https://frontendmemoire.onrender.com"
-}, allowCredentials = "true")
+// 🌐 L'annotation @CrossOrigin a été supprimée d'ici car elle est entièrement centralisée dans ConfigurationSecurite.java
 public class ProfileControleur {
 
-    @Autowired
-    private ServiceJwt jwtUtils;
+    private final ServiceJwt jwtUtils;
+    private final UtilisateurRepository utilisateurRepository;
 
-    @Autowired
-    private UtilisateurRepository utilisateurRepository;
+    // Injection par constructeur
+    public ProfileControleur(ServiceJwt jwtUtils, UtilisateurRepository utilisateurRepository) {
+        this.jwtUtils = jwtUtils;
+        this.utilisateurRepository = utilisateurRepository;
+    }
 
     @GetMapping("/utilisateur/mon-profil")
     public ResponseEntity<?> getMonProfil(HttpServletRequest request) {
         try {
-            // 🔧 CORRECTION : Lire le token depuis l'en-tête Authorization
             String token = recupererJwtDepuisHeader(request);
             if (token == null) {
-                return ResponseEntity.status(401).body(Map.of("erreur", "Non autorisé - Token manquant"));
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erreur", "Non autorisé - Token manquant"));
             }
 
             if (!jwtUtils.validateToken(token)) {
-                return ResponseEntity.status(401).body(Map.of("erreur", "Token invalide ou expiré"));
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erreur", "Token invalide ou expiré"));
             }
 
             String email = jwtUtils.getEmailFromToken(token);
@@ -56,18 +50,8 @@ public class ProfileControleur {
             userData.put("role", user.getRole().name());
             userData.put("statut", user.getStatutCycleVie());
             userData.put("statutCompte", user.getStatutCycleVie());
-
-            if (user.getPhotoProfil() != null && !user.getPhotoProfil().isEmpty()) {
-                userData.put("photoProfil", user.getPhotoProfil());
-            } else {
-                userData.put("photoProfil", null);
-            }
-
-            if (user.getImageSignature() != null && !user.getImageSignature().isEmpty()) {
-                userData.put("imageSignature", user.getImageSignature());
-            } else {
-                userData.put("imageSignature", null);
-            }
+            userData.put("photoProfil", user.getPhotoProfil()); 
+            userData.put("imageSignature", user.getImageSignature());
 
             String statusPki = user.getStatusPki();
             if (statusPki == null || statusPki.isEmpty()) {
@@ -86,10 +70,10 @@ public class ProfileControleur {
     public ResponseEntity<?> updateProfil(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             String token = recupererJwtDepuisHeader(request);
-            if (token == null) return ResponseEntity.status(401).body(Map.of("erreur", "Session expirée"));
+            if (token == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erreur", "Session expirée"));
 
             if (!jwtUtils.validateToken(token)) {
-                return ResponseEntity.status(401).body(Map.of("erreur", "Token invalide"));
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erreur", "Token invalide"));
             }
 
             String email = jwtUtils.getEmailFromToken(token);
@@ -108,10 +92,9 @@ public class ProfileControleur {
             }
 
             utilisateurRepository.save(user);
-
             return ResponseEntity.ok(Map.of("message", "Profil mis à jour avec succès !"));
         } catch (Exception e) {
-            return ResponseEntity.status(400).body(Map.of("erreur", "Erreur lors de la mise à jour : " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("erreur", "Erreur lors de la mise à jour : " + e.getMessage()));
         }
     }
 
@@ -119,7 +102,7 @@ public class ProfileControleur {
     public ResponseEntity<?> uploadPhoto(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             String token = recupererJwtDepuisHeader(request);
-            if (token == null) return ResponseEntity.status(401).body(Map.of("erreur", "Non autorisé"));
+            if (token == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erreur", "Non autorisé"));
 
             String email = jwtUtils.getEmailFromToken(token);
             Utilisateur user = utilisateurRepository.findByEmail(email)
@@ -135,25 +118,14 @@ public class ProfileControleur {
 
             return ResponseEntity.ok(Map.of("message", "Photo de profil mise à jour avec succès"));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("erreur", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("erreur", e.getMessage()));
         }
     }
 
-    // 🔧 NOUVELLE MÉTHODE : Lire le token depuis l'en-tête Authorization
     private String recupererJwtDepuisHeader(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
-        }
-        return null;
-    }
-
-    // Ancienne méthode (gardée pour compatibilité si nécessaire)
-    private String recupererJwtDepuisCookie(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("accessToken".equals(cookie.getName())) return cookie.getValue();
-            }
         }
         return null;
     }

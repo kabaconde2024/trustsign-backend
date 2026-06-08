@@ -1,9 +1,9 @@
 package pfe.back_end.configuration;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -14,7 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -23,8 +23,12 @@ import java.util.Collections;
 @EnableMethodSecurity
 public class ConfigurationSecurite {
 
-    @Autowired
-    private FiltreJwt jwtFilter;
+    private final FiltreJwt jwtFilter;
+
+    // Injection par constructeur recommandée
+    public ConfigurationSecurite(FiltreJwt jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,8 +57,7 @@ public class ConfigurationSecurite {
                                 "/api/horodatage/statut",
                                 "/api/auth/check",
                                 "/api/debug/**",
-                                "/api/admin/pki/confirmer-identite"  // ← AJOUTER CETTE LIGNE
-
+                                "/api/admin/pki/confirmer-identite"
                         ).permitAll()
 
                         // 2. ENDPOINTS DE SIGNATURE PUBLICS
@@ -67,12 +70,10 @@ public class ConfigurationSecurite {
                                 "/api/invitations/verifier/**"
                         ).permitAll()
 
-                        // 3. ENDPOINTS IA PUBLICS
+                        // 3. ENDPOINTS IA PUBLICS (Attention aux endpoints sensibles passés ici)
                         .requestMatchers(
                                 "/api/ia/logs/public",
                                 "/api/ia/health",
-                                "/api/ia/anomalies",
-                                "/api/ia/rapports",
                                 "/api/ia/securite/verifier-integrite-rapide"
                         ).permitAll()
 
@@ -82,23 +83,23 @@ public class ConfigurationSecurite {
                                 "/api/admin/audit/test"
                         ).permitAll()
 
-                        // 5. PROTECTION PAR AUTORITÉS (hasAuthority)
+                        // 5. PROTECTION PAR AUTORITÉS (L'ordre compte : du plus spécifique au plus général)
                         .requestMatchers("/api/entreprise/**").hasAuthority("ADMIN_ENTREPRISE")
                         .requestMatchers("/api/super-admin/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/pki/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/stats/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/audit/**").hasAuthority("SUPER_ADMIN")
                         .requestMatchers("/api/admin/config").hasAuthority("SUPER_ADMIN")
-                        
-                        // Tout ce qui commence par /api/admin/ requiert l'autorité SUPER_ADMIN
                         .requestMatchers("/api/admin/**").hasAuthority("SUPER_ADMIN")
 
-                        // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION SIMPLE
+                        // 6. ENDPOINTS ACCESSIBLES PAR AUTHENTIFICATION REQUSE
                         .requestMatchers(
                                 "/api/signature/quota/mon-quota",
                                 "/api/ia/securite/analyser-falsification",
                                 "/api/ia/securite/analyser-document/**",
                                 "/api/ia/analyse-document/**",
+                                "/api/ia/anomalies", // 🔒 Déplacé ici pour des raisons de sécurité
+                                "/api/ia/rapports",   // 🔒 Déplacé ici pour des raisons de sécurité
                                 "/api/signature/quota/utilisateur/**",
                                 "/api/signature/quota/reinitialiser/**",
                                 "/api/signature/quota/modifier-limite/**",
@@ -123,6 +124,7 @@ public class ConfigurationSecurite {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
+                "https://localhost:3000", // Unifié avec le contrôleur
                 "http://localhost:8080",
                 "http://localhost:8000",
                 "https://frontendmemoire.onrender.com"
